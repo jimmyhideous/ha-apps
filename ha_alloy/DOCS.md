@@ -1,63 +1,74 @@
 # HA Alloy
 
-This app runs Grafana Alloy, reads the Home Assistant OS host journal and pushes every line to a Loki
-server. You can then search Core, Supervisor, app and OS logs in Grafana next to the rest of your logs.
+Grafana Alloy reads the Home Assistant OS host journal (Core, Supervisor, apps, OS) and pushes it to Grafana Loki.
 
 ## Installation
 
-1. Add this repository to Home Assistant: **Settings > Apps > Install app**, then the menu in the top right,
-   **Repositories**, and add `https://github.com/jimmyhideous/ha-apps`.
+1. Add the repository `https://github.com/jimmyhideous/ha-apps` (**Settings > Apps > Install app >** menu **> Repositories**).
 2. Install **HA Alloy**.
-3. Set `loki_url` to your Loki server's push endpoint (see below) and start the app.
-4. Check the app log: it prints the endpoint it ships to. In Grafana, query `{job="journal"}`.
+3. Set `loki_url` and start the app.
+4. In Grafana, query `{job="journal"}`.
 
-## Permissions
+## Options
 
-The app only requests `journald: true`, which mounts the host journal read-only. It does **not** use the host
-network or PID namespace, does not map `/config`, `/share` or `/ssl`, and has no Home Assistant or Supervisor API
-access, so it cannot read `secrets.yaml`.
+| Option | Default | Description |
+|---|---|---|
+| `loki_url` | `http://loki:3100/loki/api/v1/push` | Loki push endpoint (placeholder; set your own). |
+| `host_label` | `homeassistant` | Value of the `host` label. |
+| `max_age` | `12h` | Journal look-back on first start. The read position is kept in `/data`. |
+| `config_mode` | `merged` | `builtin`, `merged` or `custom`, see [Config folder](#config-folder). |
+| `log_level` | `warn` | Alloy log level: `error`, `warn`, `info`, `debug`. |
+| `exclude` | unset | Regex. Drops lines whose `app` or `unit` label matches it. Fully anchored: `addon_.*`, not `addon_`. |
+| `memory_limit` | unset | Go soft memory limit (`GOMEMLIMIT`), e.g. `128MiB`. |
+| `bearer_token` | unset | `Authorization: Bearer` token for Loki. |
+| `basic_auth_username` | unset | Basic auth username for Loki. |
+| `basic_auth_password` | unset | Basic auth password for Loki. |
+| `tenant_id` | unset | `X-Scope-OrgID` header for Loki. |
+| `tls_insecure_skip_verify` | `false` | Skip TLS certificate verification. |
+| `ca_file` | unset | CA certificate for Loki, a path under `/config`. |
 
-It also ships its own AppArmor profile. Grafana Alloy runs in a child profile that can only read the journal,
-its own configuration and the system files Go needs (DNS, CA certificates), write its read position under
-`/data`, and open TCP/UDP sockets.
+`bearer_token` and basic auth are mutually exclusive. The Loki and auth options apply to the built-in writer
+(`builtin` and `merged`).
 
-## Configuration
+## Config folder
 
-```yaml
-loki_url: "http://loki:3100/loki/api/v1/push"
-host_label: "homeassistant"
-max_age: "12h"
-```
+`/addon_configs/<repository>_ha_alloy/` on the host is `/config` in the app. Alloy loads every `*.alloy` file in
+it as one configuration together with the built-in pipeline.
 
-### Option: `loki_url`
+| `config_mode` | Loaded |
+|---|---|
+| `builtin` | built-in pipeline only |
+| `merged` | built-in pipeline and `/config/*.alloy` |
+| `custom` | `/config/*.alloy` only |
 
-The Loki push endpoint, ending in `/loki/api/v1/push`. The default `http://loki:3100/loki/api/v1/push` is only
-a placeholder: replace it with the address of your own Loki server, for example
-`http://192.0.2.10:3100/loki/api/v1/push` or `https://loki.example.com/loki/api/v1/push`.
+- Component labels must be unique across all files. Built-in components: `loki.relabel "journal"`,
+  `loki.relabel "exclude"`, `loki.source.journal "haos"`, `loki.process "haos"`, `loki.write "loki"`.
+- In `merged` mode, forward to `loki.write.loki.receiver` to use the built-in writer.
+- A `logging` block in a user file replaces the `log_level` option.
+- Environment: `LOKI_URL`, `HOST_LABEL`, `MAX_AGE` (`sys.env("LOKI_URL")`).
+- An empty folder gets `example.alloy.disabled` on start. Existing files are never changed.
 
-The Loki server (or the proxy in front of it) must accept pushes from Home Assistant's IP address. This app sends
-no credentials and no tenant header, so put an authenticating proxy in front of Loki if others can reach it.
+## Alloy UI
 
-### Option: `host_label`
-
-The value of the `host` label on every line.
-
-### Option: `max_age`
-
-How far back to start reading on first start. After that, Alloy keeps its read position in `/data` and resumes
-from there after restarts, so lines are not sent twice.
+**Open Web UI** on the app page shows the Alloy component graph and health through Ingress. Enable
+**Show in sidebar** for a panel.
 
 ## Labels
 
-| Label | Source |
+| Label | Value |
 |---|---|
-| `job` | always `journal` |
-| `host` | the `host_label` option |
-| `app` | the container name as Docker/Supervisor show it (`homeassistant`, `hassio_supervisor`, `app_<repo>_<slug>`), else the syslog identifier of the host service |
-| `unit` | the systemd unit, for host services |
-| `level` | Core/Supervisor: from the line (`debug`, `info`, `warning`, `error`, `critical`). Other app containers: `stdout` or `stderr` (Docker only records the stream). Host services: the journal priority |
+| `job` | `journal` |
+| `host` | `host_label` |
+| `app` | container name (`homeassistant`, `hassio_supervisor`, `app_<repo>_<slug>`), else syslog identifier |
+| `unit` | systemd unit (host services) |
+| `level` | Core/Supervisor: level from the line. Other containers: `stdout`/`stderr`. Host services: journal priority |
 
-## Privacy
+URL query strings and URL user info are replaced with `<query removed>` / `<userinfo removed>` before shipping.
 
-Before anything leaves Home Assistant, the app replaces URL query strings with `<query removed>` and URL
-user info (`user:pass@`) with `<userinfo removed>`, because integrations sometimes log URLs that contain API keys.
+## Permissions
+
+- `journald: true`: host journal, read-only.
+- `addon_config`: the app's own config folder, read/write.
+- Ingress: only the Supervisor (`172.30.32.2`) reaches the UI port.
+- AppArmor: Alloy and nginx run in child profiles. No host network, no Home Assistant API, no `/config` of Home
+  Assistant, no `/ssl`.

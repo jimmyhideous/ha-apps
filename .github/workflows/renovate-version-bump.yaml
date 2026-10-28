@@ -1,16 +1,8 @@
 name: Renovate version bump
 
-# Renovate can update ARG ALLOY_VERSION in an app's Dockerfile, but it can't bump the app's `version` or write
-# the changelog. This workflow does both on Renovate's pull request, so merging it publishes a new image tag.
-#
-# - Only runs for Renovate PRs from this repository that change an app's Dockerfile.
-# - Idempotent: an app is bumped only while its `version` on the PR still equals the one on main, so a Renovate
-#   rebase (which drops this commit) gets a fresh bump and this workflow never bumps its own commit twice.
-# - The commit is authored by github-actions[bot]; renovate.json lists that author in gitIgnoredAuthors so
-#   Renovate keeps managing (and automerging) the branch.
-# - Commits pushed with GITHUB_TOKEN don't start new workflow runs, so the lint and build checks are started
-#   for the new commit with workflow_dispatch. If a BUMP_TOKEN secret (fine-grained PAT, contents: write on
-#   this repository) exists, it is used for the push instead and the normal pull_request checks run.
+# On Renovate PRs that change an app's Dockerfile: patch-bump `version` and add a changelog entry, once per PR
+# (only while `version` equals main's). Pushes with BUMP_TOKEN if set, else GITHUB_TOKEN plus workflow_dispatch
+# runs of Lint and Builder.
 
 on:
   pull_request:
@@ -37,7 +29,7 @@ jobs:
       actions: write
       contents: write
     env:
-      # `secrets` can't be used in `if:` conditions, so expose whether the PAT exists.
+      # `secrets` is not available in `if:`.
       HAS_BUMP_TOKEN: ${{ secrets.BUMP_TOKEN != '' }}
     steps:
       - name: Check out the pull request branch

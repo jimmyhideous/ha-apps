@@ -10,7 +10,7 @@ on:
   push:
     branches:
       - main
-  # Lets the Renovate version-bump workflow re-run the build check on the commit it pushed (never publishes).
+  # Started by Renovate version bump; never publishes.
   workflow_dispatch:
 
 permissions:
@@ -43,7 +43,7 @@ jobs:
         run: |
           changed_apps=()
 
-          # If the workflow file itself changed, rebuild all apps
+          # Workflow changes rebuild every app.
           if [[ "${CHANGED_FILES}" =~ \.github/workflows/(builder|build-app)\.yaml ]]; then
             changed_apps=(${APPS})
           else
