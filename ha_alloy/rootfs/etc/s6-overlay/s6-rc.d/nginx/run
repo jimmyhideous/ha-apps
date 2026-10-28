@@ -3,7 +3,7 @@
 # ==============================================================================
 # Start the ingress proxy for the Alloy UI
 # ==============================================================================
-ingress_entry="$(bashio::addon.ingress_entry || true)"
+ingress_entry="$(bashio::app.ingress_entry || true)"
 [[ "${ingress_entry}" == /* ]] || ingress_entry="/"
 
 mkdir -p /run/nginx

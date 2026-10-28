@@ -67,6 +67,7 @@ mkdir -p "${DATA}/www/addons/self/options"
 echo "{\"result\": \"ok\", \"data\": ${OPTIONS}}" > "${DATA}/www/addons/self/options/config"
 echo "{\"result\": \"ok\", \"data\": {\"slug\": \"ha_alloy\", \"ingress\": true, \"ingress_entry\": \"${INGRESS_ENTRY}\", \"ingress_port\": 8099}}" \
     > "${DATA}/www/addons/self/info"
+cp -r "${DATA}/www/addons" "${DATA}/www/apps"
 # User folder: an existing file that must stay untouched and a component that uses the built-in writer.
 echo "keep me" > "${CONFIG}/README.txt"
 printf 'loki.relabel "user_smoke" {\n  forward_to = [loki.write.loki.receiver]\n}\n' > "${CONFIG}/smoke.alloy"

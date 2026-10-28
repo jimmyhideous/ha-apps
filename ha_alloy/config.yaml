@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: HA Alloy
-version: "1.2.0"
+version: "1.2.1"
 slug: ha_alloy
 description: Ships the Home Assistant OS journal to Grafana Loki with Grafana Alloy
 url: "https://github.com/jimmyhideous/ha-apps/tree/main/ha_alloy"
