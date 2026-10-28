@@ -164,7 +164,7 @@ jobs:
         run: |
           platforms=$(docker buildx imagetools inspect --raw "${IMAGE}" | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"')
           echo "${IMAGE}:"; echo "${platforms}"
-          for arch in $(tr -d '[]",' <<< "${ARCHS}"); do
+          for arch in $(jq -r '.[]' <<< "${ARCHS}"); do
             [[ "${arch}" == "aarch64" ]] && arch=arm64
             grep -qx "linux/${arch}" <<< "${platforms}" || { echo "::error::${IMAGE} has no linux/${arch} image"; exit 1; }
           done
