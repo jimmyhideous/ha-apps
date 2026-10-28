@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Loki Journal Shipper: start Grafana Alloy with settings from the app options
+# HA Alloy: start Grafana Alloy with settings from the app options
 # ==============================================================================
 export LOKI_URL HOST_LABEL MAX_AGE
 LOKI_URL="$(bashio::config 'loki_url')"

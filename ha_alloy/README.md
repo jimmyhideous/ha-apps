@@ -1,4 +1,4 @@
-# Home Assistant App: Loki Journal Shipper
+# Home Assistant App: HA Alloy
 
 _Ships the Home Assistant OS journal to Grafana Loki with Grafana Alloy._
 

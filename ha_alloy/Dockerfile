@@ -36,7 +36,7 @@ RUN \
 COPY rootfs /
 
 LABEL \
-    org.opencontainers.image.title="Home Assistant App: Loki Journal Shipper" \
+    org.opencontainers.image.title="Home Assistant App: HA Alloy" \
     org.opencontainers.image.description="Ships the Home Assistant OS journal to Grafana Loki with Grafana Alloy" \
     org.opencontainers.image.source="https://github.com/jimmyhideous/ha-apps" \
     org.opencontainers.image.licenses="MIT"

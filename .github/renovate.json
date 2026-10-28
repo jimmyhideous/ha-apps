@@ -12,8 +12,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Grafana Alloy in the loki_journal app: the Dockerfile downloads the .deb attached to the GitHub release v<ALLOY_VERSION>",
-      "managerFilePatterns": ["/^loki_journal/Dockerfile$/"],
+      "description": "Grafana Alloy in the ha_alloy app: the Dockerfile downloads the .deb attached to the GitHub release v<ALLOY_VERSION>",
+      "managerFilePatterns": ["/^ha_alloy/Dockerfile$/"],
       "matchStrings": ["ARG ALLOY_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "grafana/alloy",
       "datasourceTemplate": "github-releases",
@@ -58,9 +58,9 @@
     },
     {
       "description": "App updates need a version bump and a changelog entry, which Renovate can't write",
-      "matchFileNames": ["loki_journal/**"],
+      "matchFileNames": ["ha_alloy/**"],
       "prBodyNotes": [
-        "The `Renovate version bump` workflow bumps `version` in `loki_journal/config.yaml` and adds a matching entry to `loki_journal/CHANGELOG.md` on this pull request. Check that its commit is there before merging; merging publishes the new image tag."
+        "The `Renovate version bump` workflow bumps `version` in `ha_alloy/config.yaml` and adds a matching entry to `ha_alloy/CHANGELOG.md` on this pull request. Check that its commit is there before merging; merging publishes the new image tag."
       ]
     }
   ]

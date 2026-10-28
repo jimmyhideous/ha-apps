@@ -2,8 +2,9 @@
 
 ## 1.1.0
 
+- Renamed from `loki_journal` ("Loki Journal Shipper") to `ha_alloy` ("HA Alloy"): it runs Grafana Alloy.
 - First release from the public app repository, as a prebuilt multi-arch image
-  (`ghcr.io/jimmyhideous/app-loki-journal`) for `amd64` and `aarch64`.
+  (`ghcr.io/jimmyhideous/app-ha-alloy`) for `amd64` and `aarch64`.
 - Add an AppArmor profile: Alloy runs in its own child profile limited to the journal, its config, `/data` and
   TCP/UDP networking.
 - Install Grafana Alloy 1.21.2 from the `.deb` attached to the GitHub release, checked against the release's

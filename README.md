@@ -11,7 +11,7 @@ To add it by hand: **Settings > Apps > Install app**, the menu in the top right,
 
 This repository contains the following apps
 
-### [Loki Journal Shipper](./loki_journal)
+### [HA Alloy](./ha_alloy)
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]

@@ -1,9 +1,9 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
-name: Loki Journal Shipper
+name: HA Alloy
 version: "1.1.0"
-slug: loki_journal
+slug: ha_alloy
 description: Ships the Home Assistant OS journal to Grafana Loki with Grafana Alloy
-url: "https://github.com/jimmyhideous/ha-apps/tree/main/loki_journal"
+url: "https://github.com/jimmyhideous/ha-apps/tree/main/ha_alloy"
 arch:
   - aarch64
   - amd64
@@ -22,4 +22,4 @@ schema:
   host_label: match(^[A-Za-z0-9][A-Za-z0-9_.-]*$)
   max_age: match(^[0-9]+(s|m|h)$)
 # Multi-arch image without a tag: the Supervisor pulls the tag equal to `version`.
-image: "ghcr.io/jimmyhideous/app-loki-journal"
+image: "ghcr.io/jimmyhideous/app-ha-alloy"

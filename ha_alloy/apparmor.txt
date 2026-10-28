@@ -1,11 +1,11 @@
 #include <tunables/global>
 
-# AppArmor profile for the Loki Journal Shipper app.
+# AppArmor profile for the HA Alloy app.
 #
 # Two layers, as in the Home Assistant app template (home-assistant/apps-example):
 # - The parent profile covers s6-overlay (PID 1, s6-rc, s6-supervise) and the bashio run/finish scripts. The
-#   Supervisor renames it to "<repository hash>_loki_journal" when it loads it, so peers below use
-#   "*_loki_journal". It keeps the template's broad file rule, but has NO network rules, so nothing except
+#   Supervisor renames it to "<repository hash>_ha_alloy" when it loads it, so peers below use
+#   "*_ha_alloy". It keeps the template's broad file rule, but has NO network rules, so nothing except
 #   Alloy can open a socket.
 # - Grafana Alloy, the only long-running process (it parses journal lines and talks to Loki), switches into the
 #   child profile "alloy", which lists every file it may touch.
@@ -13,7 +13,7 @@
 # To debug a denial: add "complain" to the flags of the affected profile, run the app, read
 # `journalctl _TRANSPORT="audit" -g 'apparmor="ALLOWED"'` on the host, add the missing rule, remove "complain".
 
-profile loki_journal flags=(attach_disconnected,mediate_deleted) {
+profile ha_alloy flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
   # s6-overlay and bashio need wide file access while the container boots (template default).
@@ -48,9 +48,9 @@ profile loki_journal flags=(attach_disconnected,mediate_deleted) {
     #include <abstractions/base>
 
     # Stop/restart signals from s6-supervise (parent profile).
-    signal (receive) peer=*_loki_journal,
+    signal (receive) peer=*_ha_alloy,
     # The Go runtime signals its own threads (SIGURG for goroutine preemption).
-    signal (send, receive) peer=*_loki_journal//alloy,
+    signal (send, receive) peer=*_ha_alloy//alloy,
 
     # Network: HTTP(S) pushes to Loki and DNS lookups over IPv4/IPv6 (TCP and UDP), plus Alloy's own HTTP
     # server on 127.0.0.1:12345. netlink raw lets Go list network interfaces/addresses (read-only route info).

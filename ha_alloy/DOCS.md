@@ -1,4 +1,4 @@
-# Loki Journal Shipper
+# HA Alloy
 
 This app runs Grafana Alloy, reads the Home Assistant OS host journal and pushes every line to a Loki
 server. You can then search Core, Supervisor, app and OS logs in Grafana next to the rest of your logs.
@@ -7,7 +7,7 @@ server. You can then search Core, Supervisor, app and OS logs in Grafana next to
 
 1. Add this repository to Home Assistant: **Settings > Apps > Install app**, then the menu in the top right,
    **Repositories**, and add `https://github.com/jimmyhideous/ha-apps`.
-2. Install **Loki Journal Shipper**.
+2. Install **HA Alloy**.
 3. Set `loki_url` to your Loki server's push endpoint (see below) and start the app.
 4. Check the app log: it prints the endpoint it ships to. In Grafana, query `{job="journal"}`.
 
