@@ -41,3 +41,17 @@ jobs:
         uses: frenck/action-addon-linter@v2.21
         with:
           path: "./${{ matrix.path }}"
+
+  status:
+    name: Lint status
+    needs: [find, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that every app passed the linter
+        env:
+          FIND: ${{ needs.find.result }}
+          LINT: ${{ needs.lint.result }}
+        run: |
+          echo "find: ${FIND}, lint: ${LINT}"
+          [[ "${FIND}" == "success" && "${LINT}" == "success" ]]
