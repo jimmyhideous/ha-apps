@@ -1,0 +1,120 @@
+name: Renovate version bump
+
+# Renovate can update ARG ALLOY_VERSION in an app's Dockerfile, but it can't bump the app's `version` or write
+# the changelog. This workflow does both on Renovate's pull request, so merging it publishes a new image tag.
+#
+# - Only runs for Renovate PRs from this repository that change an app's Dockerfile.
+# - Idempotent: an app is bumped only while its `version` on the PR still equals the one on main, so a Renovate
+#   rebase (which drops this commit) gets a fresh bump and this workflow never bumps its own commit twice.
+# - The commit is authored by github-actions[bot]; renovate.json lists that author in gitIgnoredAuthors so
+#   Renovate keeps managing (and automerging) the branch.
+# - Commits pushed with GITHUB_TOKEN don't start new workflow runs, so the lint and build checks are started
+#   for the new commit with workflow_dispatch. If a BUMP_TOKEN secret (fine-grained PAT, contents: write on
+#   this repository) exists, it is used for the push instead and the normal pull_request checks run.
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-version-bump-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump app version
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]'
+      && startsWith(github.head_ref, 'renovate/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    env:
+      # `secrets` can't be used in `if:` conditions, so expose whether the PAT exists.
+      HAS_BUMP_TOKEN: ${{ secrets.BUMP_TOKEN != '' }}
+    steps:
+      - name: Check out the pull request branch
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.BUMP_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Bump version and changelog of changed apps
+        id: bump
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${BASE_REF}"
+
+          bumped=()
+          for dockerfile in $(git diff --name-only "origin/${BASE_REF}...HEAD" -- '*/Dockerfile'); do
+            app="${dockerfile%/Dockerfile}"
+            config="${app}/config.yaml"
+            changelog="${app}/CHANGELOG.md"
+            [[ -f "${config}" ]] || continue
+
+            base_version=$(git show "origin/${BASE_REF}:${config}" | sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p')
+            head_version=$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "${config}")
+            if [[ -z "${base_version}" || "${head_version}" != "${base_version}" ]]; then
+              echo "${app}: version already changed (${base_version} -> ${head_version}), skipping"
+              continue
+            fi
+            if [[ ! "${base_version}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              echo "::error::${config}: version '${base_version}' is not MAJOR.MINOR.PATCH"
+              exit 1
+            fi
+            new_version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+
+            sed -i "s/^version: .*/version: \"${new_version}\"/" "${config}"
+
+            NEW_VERSION="${new_version}" ENTRY="${PR_TITLE} (#${PR_NUMBER})" CHANGELOG="${changelog}" \
+              python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["CHANGELOG"])
+          text = path.read_text(encoding="utf-8") if path.exists() else "# Changelog\n"
+          entry = f"## {os.environ['NEW_VERSION']}\n\n- {os.environ['ENTRY']}\n\n"
+          lines = text.splitlines(keepends=True)
+          if lines and lines[0].startswith("# "):
+              head, rest = lines[0], "".join(lines[1:]).lstrip("\n")
+              text = f"{head}\n{entry}{rest}"
+          else:
+              text = entry + text
+          path.write_text(text, encoding="utf-8", newline="\n")
+          PY
+
+            git add "${config}" "${changelog}"
+            echo "${app}: ${base_version} -> ${new_version}"
+            bumped+=("${app} ${new_version}")
+          done
+
+          if [[ ${#bumped[@]} -eq 0 ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bump version: $(IFS=','; echo "${bumped[*]}")"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run checks on the bump commit
+        if: steps.bump.outputs.changed == 'true' && env.HAS_BUMP_TOKEN != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run lint.yaml --ref "${GITHUB_HEAD_REF}"
+          gh workflow run builder.yaml --ref "${GITHUB_HEAD_REF}"

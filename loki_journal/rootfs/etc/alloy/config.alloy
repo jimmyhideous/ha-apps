@@ -1,0 +1,89 @@
+// HA OS journal -> Loki. Settings come from the app options via environment variables set by the s6 run script:
+//   LOKI_URL, HOST_LABEL, MAX_AGE
+// journald: true mounts the host journal read-only at /var/log/journal/<host machine-id>/. The container has no
+// /etc/machine-id, so the default "local journal" lookup finds nothing: the directory must be given as `path`.
+
+loki.write "loki" {
+  endpoint {
+    url = sys.env("LOKI_URL")
+  }
+}
+
+loki.relabel "journal" {
+  forward_to = []
+
+  // app: the container name for Core/Supervisor/apps (homeassistant, hassio_supervisor, addon_<slug>),
+  // otherwise the syslog identifier (host services).
+  rule {
+    source_labels = ["__journal_syslog_identifier"]
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__journal_container_name"]
+    regex         = "(.+)"
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+  // For containers the journal priority only means which stream the line came from (Docker's journald driver
+  // maps stderr to err and stdout to info), and many apps log normal output to stderr. Say so honestly instead
+  // of filling the error panels; Core/Supervisor get their real level from the line below.
+  rule {
+    source_labels = ["__journal_container_name", "__journal_priority_keyword"]
+    separator     = ";"
+    regex         = ".+;(err|error)"
+    target_label  = "level"
+    replacement   = "stderr"
+  }
+  rule {
+    source_labels = ["__journal_container_name", "__journal_priority_keyword"]
+    separator     = ";"
+    regex         = ".+;(info|informational)"
+    target_label  = "level"
+    replacement   = "stdout"
+  }
+}
+
+loki.source.journal "haos" {
+  path          = "/var/log/journal"
+  max_age       = sys.env("MAX_AGE")
+  relabel_rules = loki.relabel.journal.rules
+  labels        = { job = "journal", host = sys.env("HOST_LABEL") }
+  forward_to    = [loki.process.haos.receiver]
+}
+
+loki.process "haos" {
+  // Never store credentials: integrations sometimes log URLs with ?api_key=... or user:pass@.
+  stage.replace {
+    expression = "\\?([^\\s\"]+)"
+    replace    = "<query removed>"
+  }
+  stage.replace {
+    expression = "://([^/@\\s\"]+)@"
+    replace    = "<userinfo removed>"
+  }
+
+  // Docker's journald driver only says stdout (info) or stderr (err). Core and Supervisor write their real
+  // level into the line ("2026-10-27 21:00:00.123 WARNING (MainThread) [...]"), so override `level` only on
+  // lines that carry it; every other line keeps the journald priority label.
+  stage.match {
+    selector = "{job=\"journal\"} |~ \"\\\\d (DEBUG|INFO|WARNING|ERROR|CRITICAL) \\\\(\""
+    stage.regex {
+      expression = "\\d (?P<lvl>DEBUG|INFO|WARNING|ERROR|CRITICAL) \\("
+    }
+    stage.template {
+      source   = "lvl"
+      template = "{{ ToLower .lvl }}"
+    }
+    stage.labels {
+      values = { level = "lvl" }
+    }
+  }
+  forward_to = [loki.write.loki.receiver]
+}

@@ -1,0 +1,15 @@
+---
+configuration:
+  loki_url:
+    name: Loki push URL
+    description: >-
+      Full URL of the Loki push endpoint, for example
+      https://loki.example.com/loki/api/v1/push
+  host_label:
+    name: Host label
+    description: Value of the `host` label on every line this app ships.
+  max_age:
+    name: Initial look-back
+    description: >-
+      On first start (or after positions are lost), how far back in the journal
+      to begin, e.g. 12h. Afterwards the app resumes from where it stopped.

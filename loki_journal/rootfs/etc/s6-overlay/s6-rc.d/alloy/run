@@ -1,0 +1,18 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Loki Journal Shipper: start Grafana Alloy with settings from the app options
+# ==============================================================================
+export LOKI_URL HOST_LABEL MAX_AGE
+LOKI_URL="$(bashio::config 'loki_url')"
+HOST_LABEL="$(bashio::config 'host_label')"
+MAX_AGE="$(bashio::config 'max_age')"
+
+bashio::log.info "Shipping the host journal to ${LOKI_URL%%\?*} as host=\"${HOST_LABEL}\" (max_age ${MAX_AGE})"
+
+# Positions live in /data (persistent) so a restart resumes where it stopped instead of re-sending.
+exec /usr/bin/alloy run \
+    --storage.path=/data/alloy \
+    --server.http.listen-addr=127.0.0.1:12345 \
+    --disable-reporting \
+    /etc/alloy/config.alloy

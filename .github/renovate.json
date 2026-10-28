@@ -1,0 +1,67 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+
+  "enabledManagers": ["custom.regex", "dockerfile", "github-actions"],
+
+  "semanticCommits": "disabled",
+  "labels": ["dependencies"],
+
+  "gitIgnoredAuthors": ["41898282+github-actions[bot]@users.noreply.github.com"],
+
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Grafana Alloy in the loki_journal app: the Dockerfile downloads the .deb attached to the GitHub release v<ALLOY_VERSION>",
+      "managerFilePatterns": ["/^loki_journal/Dockerfile$/"],
+      "matchStrings": ["ARG ALLOY_VERSION=(?<currentValue>\\S+)"],
+      "depNameTemplate": "grafana/alloy",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$",
+      "versioningTemplate": "semver"
+    }
+  ],
+
+  "packageRules": [
+    {
+      "description": "GitHub Actions: weekly, like Dependabot did",
+      "matchManagers": ["github-actions"],
+      "addLabels": ["github_actions"],
+      "schedule": ["before 8am on monday"]
+    },
+    {
+      "description": "Leave runner labels and action version inputs alone, Dependabot never updated those",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["github-runner", "uses-with"],
+      "enabled": false
+    },
+    {
+      "description": "Home Assistant's own actions that follow a branch (like home-assistant/actions@master) float on purpose. Pinning them would open a digest PR for each change to them. Their actions on a version tag are pinned like any other.",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["home-assistant/**"],
+      "matchCurrentValue": "/^(dev|main|master)$/",
+      "pinDigests": false
+    },
+    {
+      "description": "Grafana Alloy: wait a few days after a release, then automerge minor and patch updates once the version-bump workflow has bumped the app version and the checks pass",
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["grafana/alloy"],
+      "addLabels": ["alloy"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["grafana/alloy"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "platformAutomerge": false
+    },
+    {
+      "description": "App updates need a version bump and a changelog entry, which Renovate can't write",
+      "matchFileNames": ["loki_journal/**"],
+      "prBodyNotes": [
+        "The `Renovate version bump` workflow bumps `version` in `loki_journal/config.yaml` and adds a matching entry to `loki_journal/CHANGELOG.md` on this pull request. Check that its commit is there before merging; merging publishes the new image tag."
+      ]
+    }
+  ]
+}

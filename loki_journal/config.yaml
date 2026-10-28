@@ -1,0 +1,25 @@
+# https://contributors.home-assistant.io/apps/reference/configuration/
+name: Loki Journal Shipper
+version: "1.1.0"
+slug: loki_journal
+description: Ships the Home Assistant OS journal to Grafana Loki with Grafana Alloy
+url: "https://github.com/jimmyhideous/ha-apps/tree/main/loki_journal"
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: services
+boot: auto
+# The only privilege this app needs: read access to the host systemd journal (Core, Supervisor, every app
+# container and the OS). No host network/pid, no /config or /share map, no Supervisor/HA API access.
+journald: true
+options:
+  loki_url: "http://loki:3100/loki/api/v1/push"
+  host_label: "homeassistant"
+  max_age: "12h"
+schema:
+  loki_url: url
+  host_label: match(^[A-Za-z0-9][A-Za-z0-9_.-]*$)
+  max_age: match(^[0-9]+(s|m|h)$)
+# Multi-arch image without a tag: the Supervisor pulls the tag equal to `version`.
+image: "ghcr.io/jimmyhideous/app-loki-journal"
