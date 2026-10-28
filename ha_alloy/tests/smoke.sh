@@ -54,6 +54,9 @@ echo "${OPTIONS}" > "${DATA}/options.json"
 # bashio::config reads the options from the Supervisor API: serve them from a stand-in "supervisor" host.
 mkdir -p "${DATA}/www/addons/self/options"
 echo "{\"result\": \"ok\", \"data\": ${OPTIONS}}" > "${DATA}/www/addons/self/options/config"
+# /data is root:root 755 on Home Assistant; the profile grants no capabilities, so match it.
+sudo chown -R root:root "${DATA}"
+sudo chmod 755 "${DATA}"
 docker run -d --name supervisor --network "${NET}" -v "${DATA}/www:/www:ro" "${BUSYBOX_IMAGE}" \
     httpd -f -v -p 80 -h /www >/dev/null
 docker run -d --name app --network "${NET}" \
