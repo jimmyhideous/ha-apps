@@ -21,12 +21,18 @@ Alloy. Needs only read access to the journal._
 
 ## Maintenance
 
-- Images are built by GitHub Actions with the Home Assistant builder actions and published to GHCR as
-  `ghcr.io/jimmyhideous/app-<slug>`, tagged with the app's `version`. A merge to `main` publishes a version
-  once; a version that already exists in the registry is never pushed again, so bump `version` (and the
-  changelog) for every change that should reach users.
-- Renovate keeps Grafana Alloy and the GitHub Actions up to date. For Alloy updates, the `Renovate version
-  bump` workflow bumps the app's patch version and adds a changelog entry to the Renovate pull request.
+- `main` only changes through pull requests. Every change goes on a branch and is merged by pull request;
+  direct pushes, force pushes and deleting `main` are blocked, and `Lint app ha_alloy` must pass to merge.
+- On a pull request, `Lint` checks every app and `Builder` builds the images of the apps the PR changes,
+  without publishing them.
+- Merging to `main` builds the changed apps again and publishes them to GHCR as
+  `ghcr.io/jimmyhideous/app-<slug>`, tagged with the app's `version` and `latest`. A version that already exists
+  in the registry is skipped, so bump `version` and add a changelog entry for every change that should reach
+  users.
+- Renovate opens pull requests for new Grafana Alloy releases and GitHub Actions updates. On an Alloy pull
+  request, the `Renovate version bump` workflow commits a patch `version` bump and a changelog entry to the
+  pull request's branch. Renovate merges minor and patch Alloy updates once the checks pass; other updates are
+  merged by hand.
 
 Apps documentation: <https://contributors.home-assistant.io/apps/>
 
