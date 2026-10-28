@@ -136,6 +136,10 @@ memlimit=$(docker exec app curl -fsS http://127.0.0.1:12345/metrics | awk '$1 ==
 
 docker logs app 2>&1 | grep -c "level=debug" >/dev/null || fail "log_level debug: Alloy logged no debug lines"
 [[ "$(docker inspect -f '{{.State.Running}}' app)" == "true" ]] || fail "the app exited"
+if sudo journalctl -k --no-pager 2>/dev/null | grep 'apparmor="DENIED"' | grep 'ci_ha_alloy//alloy' \
+    | grep -E 'operation="(mknod|open|rename_src|rename_dest|unlink)"' | grep -E 'name="/(tmp|data)/'; then
+    fail "AppArmor denied Alloy a file write"
+fi
 if docker logs app 2>&1 | grep -E 'level=error|\[(emerg|alert|crit)\]'; then
     fail "Alloy or nginx logged errors"
 fi
