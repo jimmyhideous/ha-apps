@@ -1,4 +1,4 @@
-# jimmyhideous Home Assistant apps
+Home Assistant apps
 
 Home Assistant app repository.
 
