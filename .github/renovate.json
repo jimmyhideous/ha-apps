@@ -22,9 +22,9 @@
     },
     {
       "customType": "regex",
-      "description": "Loki image the ha_alloy smoke test runs against",
+      "description": "Images the ha_alloy smoke test runs (Loki, the busybox Supervisor stand-in)",
       "managerFilePatterns": ["/^ha_alloy/tests/smoke\\.sh$/"],
-      "matchStrings": ["LOKI_IMAGE=\"(?<depName>grafana/loki):(?<currentValue>[^\"]+)\""],
+      "matchStrings": ["_IMAGE=\"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\""],
       "datasourceTemplate": "docker"
     }
   ],
@@ -64,9 +64,8 @@
       "platformAutomerge": false
     },
     {
-      "description": "Loki in the smoke test: test-only, automerge minor and patch updates once the checks pass",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["grafana/loki"],
+      "description": "Smoke test images: test-only, automerge minor and patch updates once the checks pass",
+      "matchFileNames": ["ha_alloy/tests/**"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
