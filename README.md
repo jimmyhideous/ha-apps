@@ -35,10 +35,10 @@ Alloy. Needs only read access to the journal._
   in the registry is skipped, so bump `version` and add a changelog entry for every change that should reach
   users. After publishing, `Verify published image` checks that the version's manifest lists every
   architecture and runs `alloy --version` in the amd64 image.
-- Renovate opens pull requests for new Grafana Alloy releases and GitHub Actions updates. On an Alloy pull
-  request, the `Renovate version bump` workflow commits a patch `version` bump and a changelog entry to the
-  pull request's branch. Renovate merges minor and patch Alloy updates once the checks pass; other updates are
-  merged by hand.
+- Renovate opens pull requests for new Grafana Alloy releases, the base image, the Loki image used by the
+  smoke test and GitHub Actions updates. On an Alloy pull request, the `Renovate version bump` workflow commits
+  a patch `version` bump and a changelog entry to the pull request's branch. Renovate merges minor and patch
+  updates of Alloy and of the smoke test's Loki image once the checks pass; other updates are merged by hand.
 
 Apps documentation: <https://contributors.home-assistant.io/apps/>
 
