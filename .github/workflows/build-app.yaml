@@ -59,9 +59,36 @@ jobs:
           image-name: ${{ steps.normalize.outputs.image_name }}
           registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
 
+  smoke-test:
+    name: Smoke test
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Find the app's smoke test
+        id: test
+        run: |
+          if [[ -f "${{ inputs.app }}/tests/smoke.sh" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ${{ inputs.app }}/tests/smoke.sh, nothing to run."
+          fi
+
+      - name: Build the amd64 image
+        if: steps.test.outputs.run == 'true'
+        run: docker buildx build --load --platform linux/amd64 -t "smoke/${{ inputs.app }}:ci" "./${{ inputs.app }}"
+
+      - name: Run the smoke test
+        if: steps.test.outputs.run == 'true'
+        run: bash "${{ inputs.app }}/tests/smoke.sh" "smoke/${{ inputs.app }}:ci"
+
   build:
     name: Build ${{ matrix.arch }} image
-    needs: prepare
+    needs: [prepare, smoke-test]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -116,3 +143,31 @@ jobs:
             latest
           registry-prefix: ${{ needs.prepare.outputs.registry_prefix }}
           skip-existing: ${{ needs.prepare.outputs.version }}
+
+  verify:
+    name: Verify published image
+    needs: [prepare, manifest]
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    env:
+      IMAGE: ${{ needs.prepare.outputs.registry_prefix }}/${{ needs.prepare.outputs.image_name }}:${{ needs.prepare.outputs.version }}
+      ARCHS: ${{ needs.prepare.outputs.architectures }}
+    steps:
+      - name: Log in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Check the manifest lists every architecture
+        run: |
+          platforms=$(docker buildx imagetools inspect --raw "${IMAGE}" | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"')
+          echo "${IMAGE}:"; echo "${platforms}"
+          for arch in $(tr -d '[]",' <<< "${ARCHS}"); do
+            [[ "${arch}" == "aarch64" ]] && arch=arm64
+            grep -qx "linux/${arch}" <<< "${platforms}" || { echo "::error::${IMAGE} has no linux/${arch} image"; exit 1; }
+          done
+
+      - name: Run the amd64 image
+        run: docker run --rm --platform linux/amd64 --entrypoint /usr/bin/alloy "${IMAGE}" --version

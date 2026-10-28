@@ -19,6 +19,13 @@
       "datasourceTemplate": "github-releases",
       "extractVersionTemplate": "^v(?<version>.+)$",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Images the ha_alloy smoke test runs (Loki, the busybox Supervisor stand-in)",
+      "managerFilePatterns": ["/^ha_alloy/tests/smoke\\.sh$/"],
+      "matchStrings": ["_IMAGE=\"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "docker"
     }
   ],
 
@@ -57,8 +64,14 @@
       "platformAutomerge": false
     },
     {
+      "description": "Smoke test images: test-only, automerge minor and patch updates once the checks pass",
+      "matchFileNames": ["ha_alloy/tests/**"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
       "description": "App updates need a version bump and a changelog entry, which Renovate can't write",
-      "matchFileNames": ["ha_alloy/**"],
+      "matchFileNames": ["ha_alloy/**", "!ha_alloy/tests/**"],
       "prBodyNotes": [
         "The `Renovate version bump` workflow bumps `version` in `ha_alloy/config.yaml` and adds a matching entry to `ha_alloy/CHANGELOG.md` on this pull request. Check that its commit is there before merging; merging publishes the new image tag."
       ]

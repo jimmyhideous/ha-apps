@@ -1,7 +1,7 @@
 name: Builder
 
 env:
-  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs"
+  MONITORED_FILES: "config.json config.yaml config.yml Dockerfile rootfs tests"
 
 on:
   pull_request:
@@ -81,3 +81,18 @@ jobs:
       app: ${{ matrix.app }}
       publish: ${{ github.event_name == 'push' }}
     secrets: inherit
+
+  status:
+    name: Builder status
+    needs: [init, build-app]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that every app build succeeded
+        env:
+          INIT: ${{ needs.init.result }}
+          BUILD: ${{ needs.build-app.result }}
+        run: |
+          echo "init: ${INIT}, build-app: ${BUILD}"
+          [[ "${INIT}" == "success" ]]
+          [[ "${BUILD}" == "success" || "${BUILD}" == "skipped" ]]

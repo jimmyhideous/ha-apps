@@ -21,12 +21,24 @@ Alloy. Needs only read access to the journal._
 
 ## Maintenance
 
-- Images are built by GitHub Actions with the Home Assistant builder actions and published to GHCR as
-  `ghcr.io/jimmyhideous/app-<slug>`, tagged with the app's `version`. A merge to `main` publishes a version
-  once; a version that already exists in the registry is never pushed again, so bump `version` (and the
-  changelog) for every change that should reach users.
-- Renovate keeps Grafana Alloy and the GitHub Actions up to date. For Alloy updates, the `Renovate version
-  bump` workflow bumps the app's patch version and adds a changelog entry to the Renovate pull request.
+- `main` only changes through pull requests. Every change goes on a branch and is merged by pull request;
+  direct pushes, force pushes and deleting `main` are blocked.
+- On a pull request, `Lint` checks every app and `Builder` builds the images of the apps the PR changes for
+  every architecture, without publishing them. Before those builds, `Smoke test` builds the amd64 image and
+  runs the app's `tests/smoke.sh`: for `ha_alloy` it starts Loki and the app under its AppArmor profile with
+  the runner's journal mounted, writes a marker line to the journal and passes when Loki returns it. `Lint status` and `Builder status` sum these up and must pass
+  before a pull request can merge.
+- Auto-merge is enabled: a pull request set to auto-merge merges as soon as `Lint status` and
+  `Builder status` pass.
+- Merging to `main` builds the changed apps again and publishes them to GHCR as
+  `ghcr.io/jimmyhideous/app-<slug>`, tagged with the app's `version` and `latest`. A version that already exists
+  in the registry is skipped, so bump `version` and add a changelog entry for every change that should reach
+  users. After publishing, `Verify published image` checks that the version's manifest lists every
+  architecture and runs `alloy --version` in the amd64 image.
+- Renovate opens pull requests for new Grafana Alloy releases, the base image, the Loki image used by the
+  smoke test and GitHub Actions updates. On an Alloy pull request, the `Renovate version bump` workflow commits
+  a patch `version` bump and a changelog entry to the pull request's branch. Renovate merges minor and patch
+  updates of Alloy and of the smoke test's Loki image once the checks pass; other updates are merged by hand.
 
 Apps documentation: <https://contributors.home-assistant.io/apps/>
 
