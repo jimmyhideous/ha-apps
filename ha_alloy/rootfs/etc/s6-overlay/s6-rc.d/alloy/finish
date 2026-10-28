@@ -1,7 +1,7 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Take down the container if Alloy exits, so the Supervisor sees the app stop
+# Stop the container when Alloy exits
 # ==============================================================================
 readonly exit_code_container=$(</run/s6-linux-init-container-results/exitcode)
 readonly exit_code_service="${1}"

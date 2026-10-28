@@ -12,7 +12,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Grafana Alloy in the ha_alloy app: the Dockerfile downloads the .deb attached to the GitHub release v<ALLOY_VERSION>",
+      "description": "ha_alloy: Grafana Alloy release (ARG ALLOY_VERSION)",
       "managerFilePatterns": ["/^ha_alloy/Dockerfile$/"],
       "matchStrings": ["ARG ALLOY_VERSION=(?<currentValue>\\S+)"],
       "depNameTemplate": "grafana/alloy",
@@ -22,7 +22,7 @@
     },
     {
       "customType": "regex",
-      "description": "Images the ha_alloy smoke test runs (Loki, the busybox Supervisor stand-in)",
+      "description": "ha_alloy smoke test images",
       "managerFilePatterns": ["/^ha_alloy/tests/smoke\\.sh$/"],
       "matchStrings": ["_IMAGE=\"(?<depName>[^\":]+):(?<currentValue>[^\"]+)\""],
       "datasourceTemplate": "docker"
@@ -31,32 +31,33 @@
 
   "packageRules": [
     {
-      "description": "GitHub Actions: weekly, like Dependabot did",
+      "description": "GitHub Actions: weekly",
       "matchManagers": ["github-actions"],
       "addLabels": ["github_actions"],
       "schedule": ["before 8am on monday"]
     },
     {
-      "description": "Leave runner labels and action version inputs alone, Dependabot never updated those",
+      "description": "Ignore runner labels and action version inputs",
       "matchManagers": ["github-actions"],
       "matchDepTypes": ["github-runner", "uses-with"],
       "enabled": false
     },
     {
-      "description": "Home Assistant's own actions that follow a branch (like home-assistant/actions@master) float on purpose. Pinning them would open a digest PR for each change to them. Their actions on a version tag are pinned like any other.",
+      "description": "Home Assistant actions on a branch (dev/main/master): not pinned",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["home-assistant/**"],
       "matchCurrentValue": "/^(dev|main|master)$/",
       "pinDigests": false
     },
     {
-      "description": "Grafana Alloy: wait a few days after a release, then automerge minor and patch updates once the version-bump workflow has bumped the app version and the checks pass",
+      "description": "Grafana Alloy: releases older than 3 days",
       "matchDatasources": ["github-releases"],
       "matchPackageNames": ["grafana/alloy"],
       "addLabels": ["alloy"],
       "minimumReleaseAge": "3 days"
     },
     {
+      "description": "Grafana Alloy: automerge minor and patch",
       "matchDatasources": ["github-releases"],
       "matchPackageNames": ["grafana/alloy"],
       "matchUpdateTypes": ["minor", "patch"],
@@ -64,16 +65,16 @@
       "platformAutomerge": false
     },
     {
-      "description": "Smoke test images: test-only, automerge minor and patch updates once the checks pass",
+      "description": "Smoke test images: automerge minor and patch",
       "matchFileNames": ["ha_alloy/tests/**"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
     {
-      "description": "App updates need a version bump and a changelog entry, which Renovate can't write",
+      "description": "App updates: note about the version bump commit",
       "matchFileNames": ["ha_alloy/**", "!ha_alloy/tests/**"],
       "prBodyNotes": [
-        "The `Renovate version bump` workflow bumps `version` in `ha_alloy/config.yaml` and adds a matching entry to `ha_alloy/CHANGELOG.md` on this pull request. Check that its commit is there before merging; merging publishes the new image tag."
+        "`Renovate version bump` adds the `version` bump and `CHANGELOG.md` entry to this pull request. Merging publishes the new image tag."
       ]
     }
   ]

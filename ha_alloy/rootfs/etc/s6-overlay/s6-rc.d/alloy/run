@@ -1,18 +1,129 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# HA Alloy: start Grafana Alloy with settings from the app options
+# Assemble /run/alloy from the app options and /config, then start Grafana Alloy
 # ==============================================================================
-export LOKI_URL HOST_LABEL MAX_AGE
+readonly RUNTIME=/run/alloy
+readonly USER_DIR=/config
+
+export LOKI_URL HOST_LABEL MAX_AGE LOG_LEVEL
 LOKI_URL="$(bashio::config 'loki_url')"
 HOST_LABEL="$(bashio::config 'host_label')"
 MAX_AGE="$(bashio::config 'max_age')"
+LOG_LEVEL="$(bashio::config 'log_level')"
+mode="$(bashio::config 'config_mode')"
 
-bashio::log.info "Shipping the host journal to ${LOKI_URL%%\?*} as host=\"${HOST_LABEL}\" (max_age ${MAX_AGE})"
+if bashio::config.has_value 'memory_limit'; then
+    export GOMEMLIMIT
+    GOMEMLIMIT="$(bashio::config 'memory_limit')"
+fi
 
-# Positions live in /data (persistent) so a restart resumes where it stopped instead of re-sending.
+rm -rf "${RUNTIME}"
+mkdir -p "${RUNTIME}"
+
+if [[ -d "${USER_DIR}" && -z "$(ls -A "${USER_DIR}")" ]]; then
+    cp /etc/alloy/example.alloy.disabled "${USER_DIR}/"
+fi
+
+write_exclude() {
+    echo 'loki.relabel "exclude" {'
+    echo '  forward_to = [loki.process.haos.receiver]'
+    if bashio::config.has_value 'exclude'; then
+        export EXCLUDE
+        EXCLUDE="$(bashio::config 'exclude')"
+        for label in app unit; do
+            echo '  rule {'
+            echo "    source_labels = [\"${label}\"]"
+            echo '    regex         = sys.env("EXCLUDE")'
+            echo '    action        = "drop"'
+            echo '  }'
+        done
+    fi
+    echo '}'
+}
+
+write_loki() {
+    echo 'loki.write "loki" {'
+    echo '  endpoint {'
+    echo '    url = sys.env("LOKI_URL")'
+    if bashio::config.has_value 'bearer_token'; then
+        export LOKI_BEARER_TOKEN
+        LOKI_BEARER_TOKEN="$(bashio::config 'bearer_token')"
+        echo '    bearer_token = sys.env("LOKI_BEARER_TOKEN")'
+    fi
+    if bashio::config.has_value 'basic_auth_username'; then
+        export LOKI_BASIC_AUTH_USERNAME
+        LOKI_BASIC_AUTH_USERNAME="$(bashio::config 'basic_auth_username')"
+        echo '    basic_auth {'
+        echo '      username = sys.env("LOKI_BASIC_AUTH_USERNAME")'
+        if bashio::config.has_value 'basic_auth_password'; then
+            export LOKI_BASIC_AUTH_PASSWORD
+            LOKI_BASIC_AUTH_PASSWORD="$(bashio::config 'basic_auth_password')"
+            echo '      password = sys.env("LOKI_BASIC_AUTH_PASSWORD")'
+        fi
+        echo '    }'
+    fi
+    if bashio::config.has_value 'tenant_id'; then
+        export LOKI_TENANT_ID
+        LOKI_TENANT_ID="$(bashio::config 'tenant_id')"
+        echo '    tenant_id = sys.env("LOKI_TENANT_ID")'
+    fi
+    echo '    tls_config {'
+    if bashio::config.true 'tls_insecure_skip_verify'; then
+        echo '      insecure_skip_verify = true'
+    else
+        echo '      insecure_skip_verify = false'
+    fi
+    if bashio::config.has_value 'ca_file'; then
+        export LOKI_CA_FILE
+        LOKI_CA_FILE="$(bashio::config 'ca_file')"
+        echo '      ca_file = sys.env("LOKI_CA_FILE")'
+    fi
+    echo '    }'
+    echo '  }'
+    echo '}'
+}
+
+if [[ "${mode}" != "custom" ]]; then
+    if bashio::config.has_value 'bearer_token' && bashio::config.has_value 'basic_auth_username'; then
+        bashio::exit.nok "Set either bearer_token or basic_auth_username/basic_auth_password, not both."
+    fi
+    if bashio::config.has_value 'basic_auth_password' && ! bashio::config.has_value 'basic_auth_username'; then
+        bashio::exit.nok "basic_auth_password needs basic_auth_username."
+    fi
+    if bashio::config.has_value 'ca_file' && [[ ! -f "$(bashio::config 'ca_file')" ]]; then
+        bashio::exit.nok "ca_file $(bashio::config 'ca_file') does not exist."
+    fi
+    cp /etc/alloy/journal.alloy "${RUNTIME}/journal.alloy"
+    write_exclude > "${RUNTIME}/exclude.alloy"
+    write_loki > "${RUNTIME}/loki_write.alloy"
+    bashio::log.info "Shipping the host journal to $(sed -E 's|\?.*||; s|://[^/@]*@|://|' <<< "${LOKI_URL}") as host=\"${HOST_LABEL}\""
+fi
+
+if [[ "${mode}" != "builtin" ]]; then
+    shopt -s nullglob
+    for file in "${USER_DIR}"/*.alloy; do
+        cp "${file}" "${RUNTIME}/user_$(basename "${file}")"
+        bashio::log.info "Loading ${file}"
+    done
+    shopt -u nullglob
+fi
+
+if ! compgen -G "${RUNTIME}/*.alloy" > /dev/null; then
+    bashio::exit.nok "config_mode is custom, but ${USER_DIR} has no .alloy files."
+fi
+
+if ! grep -qsE '^[[:space:]]*logging[[:space:]]*\{' "${RUNTIME}"/*.alloy; then
+    printf 'logging {\n  level  = sys.env("LOG_LEVEL")\n  format = "logfmt"\n}\n' > "${RUNTIME}/logging.alloy"
+fi
+
+ingress_entry="$(bashio::addon.ingress_entry || true)"
+[[ "${ingress_entry}" == /* ]] || ingress_entry="/"
+
 exec /usr/bin/alloy run \
     --storage.path=/data/alloy \
     --server.http.listen-addr=127.0.0.1:12345 \
+    --server.http.ui-path-prefix="${ingress_entry}" \
+    --server.http.enable-pprof=false \
     --disable-reporting \
-    /etc/alloy/config.alloy
+    "${RUNTIME}"

@@ -9,7 +9,7 @@ on:
       - main
   schedule:
     - cron: "0 0 * * *"
-  # Lets the Renovate version-bump workflow re-run the lint on the commit it pushed.
+  # Started by Renovate version bump.
   workflow_dispatch:
 
 jobs:

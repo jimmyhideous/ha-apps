@@ -1,0 +1,12 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Start the ingress proxy for the Alloy UI
+# ==============================================================================
+ingress_entry="$(bashio::addon.ingress_entry || true)"
+[[ "${ingress_entry}" == /* ]] || ingress_entry="/"
+
+mkdir -p /run/nginx
+sed "s|%%INGRESS_ENTRY%%|${ingress_entry%/}|" /etc/nginx/ingress.conf.tmpl > /run/nginx/nginx.conf
+
+exec /usr/sbin/nginx -c /run/nginx/nginx.conf

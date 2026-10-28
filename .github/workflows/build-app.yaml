@@ -119,7 +119,7 @@ jobs:
             io.hass.description=${{ needs.prepare.outputs.description }}
             ${{ needs.prepare.outputs.url && format('io.hass.url={0}', needs.prepare.outputs.url) || '' }}
           push: ${{ inputs.publish }}
-          # Never re-push a published version (e.g. after a workflow-only change): bump `version` instead.
+          # Skip versions already in the registry.
           skip-existing: ${{ needs.prepare.outputs.version }}
           version: ${{ needs.prepare.outputs.version }}
 
