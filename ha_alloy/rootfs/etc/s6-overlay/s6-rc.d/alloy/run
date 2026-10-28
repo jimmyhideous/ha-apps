@@ -117,7 +117,7 @@ if ! grep -qsE '^[[:space:]]*logging[[:space:]]*\{' "${RUNTIME}"/*.alloy; then
     printf 'logging {\n  level  = sys.env("LOG_LEVEL")\n  format = "logfmt"\n}\n' > "${RUNTIME}/logging.alloy"
 fi
 
-ingress_entry="$(bashio::addon.ingress_entry || true)"
+ingress_entry="$(bashio::app.ingress_entry || true)"
 [[ "${ingress_entry}" == /* ]] || ingress_entry="/"
 
 exec /usr/bin/alloy run \

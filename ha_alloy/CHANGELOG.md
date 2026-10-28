@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- Ingress entry read with `bashio::app.ingress_entry`.
+
 ## 1.2.0
 
 - Config folder `/config` (`addon_config`) with `config_mode`: `builtin`, `merged` (default), `custom`.
