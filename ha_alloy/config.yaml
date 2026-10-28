@@ -9,7 +9,6 @@ arch:
   - amd64
 init: false
 startup: services
-boot: auto
 # The only privilege this app needs: read access to the host systemd journal (Core, Supervisor, every app
 # container and the OS). No host network/pid, no /config or /share map, no Supervisor/HA API access.
 journald: true
