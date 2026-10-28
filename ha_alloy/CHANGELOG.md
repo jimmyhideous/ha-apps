@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2
+
+- Alloy temp files in `/data/alloy/tmp`; no AppArmor denials on position saves.
+
 ## 1.2.1
 
 - Ingress entry read with `bashio::app.ingress_entry`.

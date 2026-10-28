@@ -19,7 +19,9 @@ if bashio::config.has_value 'memory_limit'; then
 fi
 
 rm -rf "${RUNTIME}"
-mkdir -p "${RUNTIME}"
+mkdir -p "${RUNTIME}" /data/alloy/tmp
+# Temp files (positions) on the same filesystem as --storage.path.
+export TMPDIR=/data/alloy/tmp
 
 if [[ -d "${USER_DIR}" && -z "$(ls -A "${USER_DIR}")" ]]; then
     cp /etc/alloy/example.alloy.disabled "${USER_DIR}/"
