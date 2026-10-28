@@ -60,7 +60,7 @@ sudo find "${JOURNAL}" -name '*.journal' 2>/dev/null | grep -q . || JOURNAL=/run
 echo "host journal: ${JOURNAL}"
 OPTIONS=$(jq -nc --arg host "${HOST_LABEL}" --arg tenant "${TENANT}" '{
     loki_url: "http://loki:3100/loki/api/v1/push", host_label: $host, max_age: "1h",
-    config_mode: "merged", log_level: "info", exclude: "ha-alloy-excluded", memory_limit: "256MiB",
+    config_mode: "merged", log_level: "debug", exclude: "ha-alloy-excluded", memory_limit: "256MiB",
     tenant_id: $tenant, tls_insecure_skip_verify: false}')
 echo "${OPTIONS}" > "${DATA}/options.json"
 mkdir -p "${DATA}/www/addons/self/options"
@@ -133,7 +133,7 @@ echo "::endgroup::"
 memlimit=$(docker exec app curl -fsS http://127.0.0.1:12345/metrics | awk '$1 == "go_gc_gomemlimit_bytes" {printf "%d", $2}')
 [[ "${memlimit}" == "268435456" ]] || fail "memory_limit: go_gc_gomemlimit_bytes is '${memlimit}', expected 268435456"
 
-docker logs app 2>&1 | grep -q 'level=info' || fail "log_level info: Alloy logged no info lines"
+docker logs app 2>&1 | grep -c "level=debug" >/dev/null || fail "log_level debug: Alloy logged no debug lines"
 [[ "$(docker inspect -f '{{.State.Running}}' app)" == "true" ]] || fail "the app exited"
 if docker logs app 2>&1 | grep -E 'level=error|\[(emerg|alert|crit)\]'; then
     fail "Alloy or nginx logged errors"
