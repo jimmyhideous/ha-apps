@@ -24,7 +24,9 @@ Alloy. Needs only read access to the journal._
 - `main` only changes through pull requests. Every change goes on a branch and is merged by pull request;
   direct pushes, force pushes and deleting `main` are blocked.
 - On a pull request, `Lint` checks every app and `Builder` builds the images of the apps the PR changes for
-  every architecture, without publishing them. `Lint status` and `Builder status` sum these up and must pass
+  every architecture, without publishing them. Before those builds, `Smoke test` builds the amd64 image and
+  runs the app's `tests/smoke.sh`: for `ha_alloy` it starts Loki and the app under its AppArmor profile with
+  the runner's journal mounted, writes a marker line to the journal and passes when Loki returns it. `Lint status` and `Builder status` sum these up and must pass
   before a pull request can merge.
 - Auto-merge is enabled: a pull request set to auto-merge merges as soon as `Lint status` and
   `Builder status` pass.

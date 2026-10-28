@@ -59,9 +59,36 @@ jobs:
           image-name: ${{ steps.normalize.outputs.image_name }}
           registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
 
+  smoke-test:
+    name: Smoke test
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Find the app's smoke test
+        id: test
+        run: |
+          if [[ -f "${{ inputs.app }}/tests/smoke.sh" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ${{ inputs.app }}/tests/smoke.sh, nothing to run."
+          fi
+
+      - name: Build the amd64 image
+        if: steps.test.outputs.run == 'true'
+        run: docker buildx build --load --platform linux/amd64 -t "smoke/${{ inputs.app }}:ci" "./${{ inputs.app }}"
+
+      - name: Run the smoke test
+        if: steps.test.outputs.run == 'true'
+        run: bash "${{ inputs.app }}/tests/smoke.sh" "smoke/${{ inputs.app }}:ci"
+
   build:
     name: Build ${{ matrix.arch }} image
-    needs: prepare
+    needs: [prepare, smoke-test]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
