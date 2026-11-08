@@ -1,0 +1,7 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Start the ingress proxy for the terminal
+# ==============================================================================
+mkdir -p /run/nginx
+exec /usr/sbin/nginx -c /etc/nginx/ingress.conf

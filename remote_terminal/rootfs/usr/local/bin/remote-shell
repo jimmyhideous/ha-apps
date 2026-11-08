@@ -1,0 +1,53 @@
+#!/bin/bash
+# Runs once per terminal connection: SSH to the configured host and attach the tmux session there (or a login shell
+# when tmux_session is empty), with env_vars set. The session gets its own tmux server, socket named like the
+# session, so it is independent of the host's other tmux servers. Arguments, if any, replace the remote command and
+# get no env_vars. A failed login shows the app's public key in the panel.
+set -euo pipefail
+
+opt() { jq -r --arg k "$1" '.[$k] // empty' /data/options.json; }
+
+host="$(opt host)"
+port="$(opt port)"
+username="$(opt username)"
+session="$(opt tmux_session)"
+
+# ssh passes the remote command to the host's login shell as one string, so values are quoted with @sh.
+if (($#)); then
+    remote=("$@")
+elif [[ -n "${session}" ]]; then
+    # set-environment -g reaches new sessions and new windows; shells already running keep their environment.
+    tmux_env="$(jq -r '[.env_vars[]? | "set-environment -g \(.name) \(.value | @sh) \\;"] | join(" ")' /data/options.json)"
+    remote=("tmux -L ${session} start-server \\; ${tmux_env} new-session -A -s ${session}")
+else
+    assignments="$(jq -r '[.env_vars[]? | "\(.name)=\(.value | @sh)"] | join(" ")' /data/options.json)"
+    remote=()
+    [[ -n "${assignments}" ]] && remote=("exec env ${assignments} \"\$SHELL\" -l")
+fi
+
+ssh_cmd=(ssh -t
+    -p "${port}"
+    -i /data/ssh/id_ed25519
+    -o IdentitiesOnly=yes
+    -o BatchMode=yes
+    -o UserKnownHostsFile=/data/ssh/known_hosts
+    -o StrictHostKeyChecking=accept-new
+    -o ServerAliveInterval=30
+    "${username}@${host}")
+
+(($#)) && exec "${ssh_cmd[@]}" "${remote[@]}"
+
+status=0
+"${ssh_cmd[@]}" "${remote[@]}" || status=$?
+# ssh exits 255 when it cannot connect or log in. A new install's key is not on the host yet, so the panel shows it
+# and waits: ttyd closes the panel as soon as this script exits.
+if ((status == 255)); then
+    echo
+    echo "Could not log in as ${username}@${host}. If the host rejected the key, add this line to"
+    echo "~${username}/.ssh/authorized_keys there, optionally prefixed with from=\"<Home Assistant IP>\":"
+    echo
+    cat /data/ssh/id_ed25519.pub
+    echo
+    read -r -p "Press Enter to reconnect. " || true
+fi
+exit "${status}"

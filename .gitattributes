@@ -1,0 +1,4 @@
+# Everything that ends up in the image or on a Linux runner must keep LF line endings
+# (a CRLF shebang breaks the s6 run/finish scripts).
+* text=auto eol=lf
+*.png binary

@@ -1,0 +1,76 @@
+// Built-in pipeline: journal -> loki.relabel.exclude -> loki.process.haos -> loki.write.loki.
+// loki.relabel "exclude", loki.write "loki" and logging are generated in /run/alloy by the run script.
+
+loki.relabel "journal" {
+  forward_to = []
+
+  // app: container name, else syslog identifier.
+  rule {
+    source_labels = ["__journal_syslog_identifier"]
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__journal_container_name"]
+    regex         = "(.+)"
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+  // Containers: the journald priority is the output stream.
+  rule {
+    source_labels = ["__journal_container_name", "__journal_priority_keyword"]
+    separator     = ";"
+    regex         = ".+;(err|error)"
+    target_label  = "level"
+    replacement   = "stderr"
+  }
+  rule {
+    source_labels = ["__journal_container_name", "__journal_priority_keyword"]
+    separator     = ";"
+    regex         = ".+;(info|informational)"
+    target_label  = "level"
+    replacement   = "stdout"
+  }
+}
+
+// The container has no /etc/machine-id: the journal directory must be given explicitly.
+loki.source.journal "haos" {
+  path          = "/var/log/journal"
+  max_age       = sys.env("MAX_AGE")
+  relabel_rules = loki.relabel.journal.rules
+  labels        = { job = "journal", host = sys.env("HOST_LABEL") }
+  forward_to    = [loki.relabel.exclude.receiver]
+}
+
+loki.process "haos" {
+  stage.replace {
+    expression = "\\?([^\\s\"]+)"
+    replace    = "<query removed>"
+  }
+  stage.replace {
+    expression = "://([^/@\\s\"]+)@"
+    replace    = "<userinfo removed>"
+  }
+
+  // Core/Supervisor: level from the line ("... WARNING (MainThread) [...]").
+  stage.match {
+    selector = "{job=\"journal\"} |~ \"\\\\d (DEBUG|INFO|WARNING|ERROR|CRITICAL) \\\\(\""
+    stage.regex {
+      expression = "\\d (?P<lvl>DEBUG|INFO|WARNING|ERROR|CRITICAL) \\("
+    }
+    stage.template {
+      source   = "lvl"
+      template = "{{ ToLower .lvl }}"
+    }
+    stage.labels {
+      values = { level = "lvl" }
+    }
+  }
+  forward_to = [loki.write.loki.receiver]
+}

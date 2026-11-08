@@ -1,0 +1,45 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Create the client key on first start and serve the terminal on localhost
+# ==============================================================================
+bashio::config.require 'host'
+bashio::config.require 'username'
+
+mkdir -p /data/ssh
+chmod 700 /data/ssh
+if ! bashio::fs.file_exists /data/ssh/id_ed25519; then
+    ssh-keygen -q -t ed25519 -N '' -C "remote-terminal@homeassistant" -f /data/ssh/id_ed25519
+    bashio::log.info "Created SSH key /data/ssh/id_ed25519"
+fi
+
+target="$(bashio::config 'username')@$(bashio::config 'host')"
+bashio::log.info "Public key; add it to ~/.ssh/authorized_keys of ${target}:"
+bashio::log.info "$(cat /data/ssh/id_ed25519.pub)"
+
+# The schema limits package names to [A-Za-z0-9+.-], so they are safe to put in the remote command unquoted.
+# Debian names are lowercase; phone keyboards capitalize the first letter.
+packages="$(jq -r '.packages // [] | map(ascii_downcase) | join(" ")' /data/options.json)"
+if [[ -n "${packages}" ]]; then
+    bashio::log.info "Installing missing packages on ${target}: ${packages}"
+    install="missing=''; for p in ${packages}; do"
+    install+=" dpkg-query -W -f='\${Status}' \"\$p\" 2>/dev/null | grep -q 'ok installed' || missing=\"\$missing \$p\"; done;"
+    install+=" [ -z \"\$missing\" ] || { sudo -n apt-get update -qq &&"
+    install+=" sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \$missing; }"
+    status=0
+    output="$(/usr/local/bin/remote-shell "${install}" </dev/null 2>&1)" || status=$?
+    grep -v '^Pseudo-terminal will not be allocated' <<< "${output}" || true
+    if [[ "${status}" -ne 0 ]]; then
+        bashio::log.warning "Package install on ${target} failed; it needs apt and passwordless sudo there"
+    fi
+fi
+
+exec ttyd \
+    --interface lo \
+    --port 7681 \
+    --writable \
+    --ping-interval 30 \
+    --client-option "fontSize=$(bashio::config 'font_size')" \
+    --client-option "titleFixed=${target}" \
+    --client-option disableLeaveAlert=true \
+    /usr/local/bin/remote-shell

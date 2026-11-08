@@ -1,0 +1,28 @@
+---
+configuration:
+  host:
+    name: Host
+    description: SSH server to connect to, a hostname or IP address.
+  port:
+    name: Port
+    description: SSH port.
+  username:
+    name: Username
+    description: User to log in as. The app's public key must be in that user's authorized_keys.
+  tmux_session:
+    name: tmux session
+    description: >-
+      Attach (or create) this tmux session on the host, so the shell survives closing the panel.
+      Empty: plain login shell, no tmux needed.
+  font_size:
+    name: Font size
+    description: Terminal font size in pixels.
+  packages:
+    name: Packages
+    description: >-
+      Debian packages to install on the host with apt when the app starts, if missing. Needs passwordless sudo
+      there.
+  env_vars:
+    name: Environment variables
+    description: >-
+      Variables set in the terminal's shell on the host. With tmux they apply to new sessions and windows.

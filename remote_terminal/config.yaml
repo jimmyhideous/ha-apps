@@ -1,0 +1,31 @@
+# https://contributors.home-assistant.io/apps/reference/configuration/
+name: Remote Terminal
+version: "1.1.1"
+slug: remote_terminal
+description: Web terminal that opens an SSH session on another host
+url: "https://github.com/jimmyhideous/ha-apps/tree/main/remote_terminal"
+arch:
+  - aarch64
+  - amd64
+init: false
+ingress: true
+panel_icon: mdi:console-network
+panel_title: Remote Terminal
+options:
+  port: 22
+  tmux_session: "web"
+  font_size: 14
+  packages: []
+  env_vars: []
+schema:
+  host: match(^[A-Za-z0-9][A-Za-z0-9.:-]*$)
+  port: port
+  username: match(^[a-z_][a-z0-9_.-]*$)
+  tmux_session: match(^[A-Za-z0-9_.-]*$)
+  font_size: int(8,32)
+  packages:
+    - match(^[A-Za-z0-9][A-Za-z0-9+.-]*$)
+  env_vars:
+    - name: match(^[A-Za-z_][A-Za-z0-9_]*$)
+      value: str
+image: "ghcr.io/jimmyhideous/app-remote-terminal"

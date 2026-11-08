@@ -1,0 +1,10 @@
+// HA Alloy loads every *.alloy file in this folder (config_mode: merged or custom).
+// Rename this file to example.alloy to enable it. Component labels must be unique across all files.
+// Built-in components (config_mode builtin/merged): loki.relabel "journal", loki.relabel "exclude",
+// loki.source.journal "haos", loki.process "haos", loki.write "loki".
+
+// Example: ship a log file from this folder with the built-in writer.
+// loki.source.file "example" {
+//   targets    = [{ __path__ = "/config/example.log", job = "file", host = sys.env("HOST_LABEL") }]
+//   forward_to = [loki.write.loki.receiver]
+// }

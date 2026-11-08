@@ -1,0 +1,43 @@
+---
+configuration:
+  loki_url:
+    name: Loki push URL
+    description: Loki push endpoint, e.g. https://loki.example.com/loki/api/v1/push
+  host_label:
+    name: Host label
+    description: Value of the `host` label.
+  max_age:
+    name: Initial look-back
+    description: How far back to read the journal on first start, e.g. 12h.
+  config_mode:
+    name: Config mode
+    description: >-
+      builtin: journal pipeline only. merged: journal pipeline and /config/*.alloy.
+      custom: /config/*.alloy only.
+  log_level:
+    name: Log level
+    description: Alloy log level.
+  exclude:
+    name: Exclude
+    description: Regex; drops lines whose `app` or `unit` label matches it in full.
+  memory_limit:
+    name: Memory limit
+    description: Go soft memory limit (GOMEMLIMIT), e.g. 128MiB.
+  bearer_token:
+    name: Bearer token
+    description: "Sent as `Authorization: Bearer <token>` to Loki."
+  basic_auth_username:
+    name: Basic auth username
+    description: HTTP basic auth username for Loki.
+  basic_auth_password:
+    name: Basic auth password
+    description: HTTP basic auth password for Loki.
+  tenant_id:
+    name: Tenant ID
+    description: Sent as `X-Scope-OrgID` to Loki.
+  tls_insecure_skip_verify:
+    name: Skip TLS verification
+    description: Accept any certificate from Loki.
+  ca_file:
+    name: CA file
+    description: CA certificate for Loki, a path under /config, e.g. /config/ca.pem.
