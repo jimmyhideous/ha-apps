@@ -26,3 +26,32 @@ configuration:
     name: Environment variables
     description: >-
       Variables set in the terminal's shell on the host. With tmux they apply to new sessions and windows.
+  sudo_password:
+    name: sudo password
+    description: >-
+      Password of the user for sudo on the host, used only for packages and the passwordless sudo grant.
+      Leave empty when the user has passwordless sudo.
+  grant_passwordless_sudo:
+    name: Grant passwordless sudo
+    description: >-
+      At start, give the user passwordless sudo on the host (a file in /etc/sudoers.d). Needs sudo there;
+      remove the sudo password afterwards.
+  init_commands:
+    name: Init commands
+    description: >-
+      Commands run on the host as the user at every start, after packages, one line each.
+  authorized_key_options:
+    name: authorized_keys options
+    description: >-
+      Options shown in front of the public key in the log and the panel, for example
+      from="192.0.2.10",no-port-forwarding.
+  keepalive_interval:
+    name: Keepalive interval
+    description: Seconds between SSH keepalive messages; 0 turns them off.
+  extra_ssh_options:
+    name: Extra SSH options
+    description: >-
+      Allowed: Compression=yes|no, ConnectTimeout=N, ServerAliveCountMax=N, TCPKeepAlive=yes|no.
+  theme:
+    name: Theme
+    description: Terminal colors.

@@ -36,7 +36,9 @@ echo "::group::Start the stand-in Supervisor"
 docker network create --subnet 172.30.32.0/23 --ip-range 172.30.33.0/24 "${NET}" >/dev/null
 # packages fails on purpose: sshd starts after the app, which must log a warning and keep running.
 OPTIONS='{"host": "sshd", "port": 22, "username": "tester", "tmux_session": "", "font_size": 14,
-    "packages": ["Tmux"], "env_vars": [{"name": "SMOKE_VAR", "value": "a b'"'"'c\"d $HOME; x"}]}'
+    "packages": ["Tmux"], "init_commands": ["echo smoke-init"], "keepalive_interval": 15,
+    "extra_ssh_options": ["ConnectTimeout=5"], "authorized_key_options": "from=\"172.30.33.0/24\"", "theme": "light", "grant_passwordless_sudo": false,
+    "env_vars": [{"name": "SMOKE_VAR", "value": "a b'"'"'c\"d $HOME; x"}]}'
 echo "${OPTIONS}" > "${DATA}/options.json"
 mkdir -p "${DATA}/www/addons/self/options"
 echo "{\"result\": \"ok\", \"data\": ${OPTIONS}}" > "${DATA}/www/addons/self/options/config"
@@ -67,6 +69,14 @@ for _ in $(seq 15); do
 done
 [[ -n "${warned}" ]] || fail "no warning for the failed package install"
 docker logs app 2>&1 | grep -q "Installing missing packages on tester@sshd: tmux" || fail "package names were not lowercased"
+# Init commands run after the package install, so their warning can come a moment later.
+init_warned=""
+for _ in $(seq 15); do
+    docker logs app 2>&1 | grep -qF "Init command failed on tester@sshd: echo smoke-init" && { init_warned=1; break; }
+    sleep 1
+done
+[[ -n "${init_warned}" ]] || fail "no warning for the failed init command"
+docker logs app 2>&1 | grep -qF "from=\"172.30.33.0/24\" ${pubkey}" || fail "the log does not show authorized_key_options"
 [[ "$(docker inspect -f '{{.State.Running}}' app)" == "true" ]] || fail "the app exited after the package install"
 # A session that cannot log in (sshd is not up yet) shows the public key in the panel.
 out=$(echo | docker exec -i app /usr/local/bin/remote-shell 2>&1 || true)

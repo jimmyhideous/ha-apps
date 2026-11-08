@@ -11,6 +11,10 @@ host="$(opt host)"
 port="$(opt port)"
 username="$(opt username)"
 session="$(opt tmux_session)"
+keepalive="$(opt keepalive_interval)"
+key_options="$(opt authorized_key_options)"
+# The schema allowlists extra_ssh_options, so none of them can run a command (no ProxyCommand and the like).
+mapfile -t extra < <(jq -r '.extra_ssh_options[]? | "-o", .' /data/options.json)
 
 # ssh passes the remote command to the host's login shell as one string, so values are quoted with @sh.
 if (($#)); then
@@ -32,7 +36,8 @@ ssh_cmd=(ssh -t
     -o BatchMode=yes
     -o UserKnownHostsFile=/data/ssh/known_hosts
     -o StrictHostKeyChecking=accept-new
-    -o ServerAliveInterval=30
+    -o ServerAliveInterval="${keepalive:-30}"
+    "${extra[@]}"
     "${username}@${host}")
 
 (($#)) && exec "${ssh_cmd[@]}" "${remote[@]}"
@@ -44,9 +49,9 @@ status=0
 if ((status == 255)); then
     echo
     echo "Could not log in as ${username}@${host}. If the host rejected the key, add this line to"
-    echo "~${username}/.ssh/authorized_keys there, optionally prefixed with from=\"<Home Assistant IP>\":"
+    echo "~${username}/.ssh/authorized_keys there:"
     echo
-    cat /data/ssh/id_ed25519.pub
+    echo "${key_options:+${key_options} }$(cat /data/ssh/id_ed25519.pub)"
     echo
     read -r -p "Press Enter to reconnect. " || true
 fi
