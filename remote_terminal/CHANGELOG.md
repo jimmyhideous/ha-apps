@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Options `sudo_password` and `grant_passwordless_sudo`: sudo for `packages` on hosts that ask for a password,
+  and a one-time passwordless sudo grant for the user.
+- Option `init_commands`: commands run on the host at every start.
+- Option `authorized_key_options`: options shown in front of the public key.
+- Options `keepalive_interval`, `extra_ssh_options` (allowlisted) and `theme` (`dark`, `light`).
+
 ## 1.1.1
 
 - `packages` accepts capitalized names and installs them lowercase.

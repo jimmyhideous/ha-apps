@@ -1,7 +1,8 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 # ==============================================================================
-# Create the client key on first start and serve the terminal on localhost
+# Create the client key on first start, prepare the host (sudo grant, packages,
+# init commands) and serve the terminal on localhost
 # ==============================================================================
 bashio::config.require 'host'
 bashio::config.require 'username'
@@ -13,25 +14,70 @@ if ! bashio::fs.file_exists /data/ssh/id_ed25519; then
     bashio::log.info "Created SSH key /data/ssh/id_ed25519"
 fi
 
-target="$(bashio::config 'username')@$(bashio::config 'host')"
-bashio::log.info "Public key; add it to ~/.ssh/authorized_keys of ${target}:"
-bashio::log.info "$(cat /data/ssh/id_ed25519.pub)"
+username="$(bashio::config 'username')"
+target="${username}@$(bashio::config 'host')"
+key_options="$(jq -r '.authorized_key_options // empty' /data/options.json)"
+bashio::log.info "Public key; add this line to ~/.ssh/authorized_keys of ${target}:"
+bashio::log.info "${key_options:+${key_options} }$(cat /data/ssh/id_ed25519.pub)"
 
-# The schema limits package names to [A-Za-z0-9+.-], so they are safe to put in the remote command unquoted.
+# Runs remote-shell's argument on the host with stdin from the caller and logs its output; returns its status.
+on_host() {
+    local status=0 output
+    output="$(/usr/local/bin/remote-shell "$1" 2>&1)" || status=$?
+    grep -v '^Pseudo-terminal will not be allocated' <<< "${output}" || true
+    return "${status}"
+}
+
+# Runs the script on stdin as root on the host. The first stdin line is sudo_password, kept out of every command
+# line. It goes to sudo only when sudo asks, so a host with passwordless sudo never runs it as a command.
+# shellcheck disable=SC2016
+ROOT_SHELL='IFS= read -r p; if sudo -n true 2>/dev/null; then sudo -n sh -s; else { printf "%s\n" "$p"; cat; } | sudo -S -p "" sh -s; fi'
+as_root() {
+    { jq -r '.sudo_password // ""' /data/options.json; cat; } | on_host "${ROOT_SHELL}"
+}
+
+# The schema limits username to [a-z0-9_.-], so it is safe in the sudoers line and file name unquoted.
+if bashio::config.true 'grant_passwordless_sudo'; then
+    bashio::log.info "Granting ${username} passwordless sudo on ${target}"
+    if as_root <<EOF; then
+f=/etc/sudoers.d/90-remote-terminal-${username}
+printf '%s ALL=(ALL) NOPASSWD: ALL\n' ${username} > "\$f.tmp" && chmod 0440 "\$f.tmp" && visudo -cqf "\$f.tmp" &&
+    mv "\$f.tmp" "\$f" || { rm -f "\$f.tmp"; exit 1; }
+EOF
+        bashio::config.has_value 'sudo_password' &&
+            bashio::log.warning "Passwordless sudo is in place; remove sudo_password from the app's options"
+    else
+        bashio::log.warning "Granting passwordless sudo on ${target} failed; it needs sudo there (set sudo_password)"
+    fi
+fi
+
+# The schema limits package names to [A-Za-z0-9+.-], so they are safe to put in the remote commands unquoted.
 # Debian names are lowercase; phone keyboards capitalize the first letter.
 packages="$(jq -r '.packages // [] | map(ascii_downcase) | join(" ")' /data/options.json)"
 if [[ -n "${packages}" ]]; then
-    bashio::log.info "Installing missing packages on ${target}: ${packages}"
-    install="missing=''; for p in ${packages}; do"
-    install+=" dpkg-query -W -f='\${Status}' \"\$p\" 2>/dev/null | grep -q 'ok installed' || missing=\"\$missing \$p\"; done;"
-    install+=" [ -z \"\$missing\" ] || { sudo -n apt-get update -qq &&"
-    install+=" sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \$missing; }"
-    status=0
-    output="$(/usr/local/bin/remote-shell "${install}" </dev/null 2>&1)" || status=$?
-    grep -v '^Pseudo-terminal will not be allocated' <<< "${output}" || true
-    if [[ "${status}" -ne 0 ]]; then
-        bashio::log.warning "Package install on ${target} failed; it needs apt and passwordless sudo there"
+    # Checked without sudo, so a host that already has every package needs no sudo at all. If the check itself
+    # fails, the install runs and reports the failure.
+    missing="$(/usr/local/bin/remote-shell "for p in ${packages}; do
+        dpkg-query -W -f='\${Status}' \"\$p\" 2>/dev/null | grep -q 'ok installed' || echo \"\$p\"; done" \
+        </dev/null 2>/dev/null)" || missing="${packages}"
+    # shellcheck disable=SC2086  # word splitting turns the lines into one space-separated list
+    missing="$(echo ${missing})"
+    if [[ -n "${missing}" ]]; then
+        bashio::log.info "Installing missing packages on ${target}: ${missing}"
+        printf 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends %s\n' \
+            "${missing}" | as_root ||
+            bashio::log.warning "Package install on ${target} failed; it needs apt and sudo there (passwordless, or set sudo_password)"
     fi
+fi
+
+while IFS= read -r command; do
+    bashio::log.info "Running on ${target}: ${command}"
+    on_host "${command}" </dev/null || bashio::log.warning "Init command failed on ${target}: ${command}"
+done < <(jq -r '.init_commands[]?' /data/options.json)
+
+theme=()
+if [[ "$(bashio::config 'theme')" == "light" ]]; then
+    theme=(--client-option 'theme={"background":"#ffffff","foreground":"#1e1e1e","cursor":"#1e1e1e","selectionBackground":"#add6ff"}')
 fi
 
 exec ttyd \
@@ -42,4 +88,5 @@ exec ttyd \
     --client-option "fontSize=$(bashio::config 'font_size')" \
     --client-option "titleFixed=${target}" \
     --client-option disableLeaveAlert=true \
+    "${theme[@]}" \
     /usr/local/bin/remote-shell
