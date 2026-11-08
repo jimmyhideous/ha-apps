@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: Remote Terminal
-version: "1.1.1"
+version: "1.2.0"
 slug: remote_terminal
 description: Web terminal that opens an SSH session on another host
 url: "https://github.com/jimmyhideous/ha-apps/tree/main/remote_terminal"
@@ -17,6 +17,11 @@ options:
   font_size: 14
   packages: []
   env_vars: []
+  grant_passwordless_sudo: false
+  init_commands: []
+  keepalive_interval: 30
+  extra_ssh_options: []
+  theme: dark
 schema:
   host: match(^[A-Za-z0-9][A-Za-z0-9.:-]*$)
   port: port
@@ -28,4 +33,13 @@ schema:
   env_vars:
     - name: match(^[A-Za-z_][A-Za-z0-9_]*$)
       value: str
+  sudo_password: password?
+  grant_passwordless_sudo: bool
+  init_commands:
+    - str
+  authorized_key_options: str?
+  keepalive_interval: int(0,3600)
+  extra_ssh_options:
+    - match(^(Compression=(yes|no)|ConnectTimeout=[0-9]{1,3}|ServerAliveCountMax=[0-9]{1,2}|TCPKeepAlive=(yes|no))$)
+  theme: list(dark|light)
 image: "ghcr.io/jimmyhideous/app-remote-terminal"
