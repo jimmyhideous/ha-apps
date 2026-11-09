@@ -10,7 +10,7 @@ on:
   push:
     branches:
       - main
-  # Started by Renovate version bump; never publishes.
+  # Manual runs; never publishes.
   workflow_dispatch:
 
 permissions:
