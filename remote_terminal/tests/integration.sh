@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Smoke test: runs the app with a stand-in Supervisor API and an SSH server, then checks the key setup, an SSH
+# Integration test: runs the app with a stand-in Supervisor API and an SSH server, then checks the key setup, an SSH
 # session through remote-shell, the ttyd page through ingress and that ingress refuses other clients.
 #
-# Usage: smoke.sh <image>   (Ubuntu runner with Docker)
+# Usage: integration.sh <image>   (Ubuntu runner with Docker)
 set -euo pipefail
 
 IMAGE="$1"
 SSHD_IMAGE="alpine:3.22"
 BUSYBOX_IMAGE="busybox:1.37.0"
-NET="remote-terminal-smoke"
-INGRESS_ENTRY="/api/hassio_ingress/smoke-token"
+NET="remote-terminal-integration"
+INGRESS_ENTRY="/api/hassio_ingress/integration-token"
 SUPERVISOR_IP="172.30.32.2"
 DATA="$(mktemp -d)"
 
@@ -36,9 +36,9 @@ echo "::group::Start the stand-in Supervisor"
 docker network create --subnet 172.30.32.0/23 --ip-range 172.30.33.0/24 "${NET}" >/dev/null
 # packages fails on purpose: sshd starts after the app, which must log a warning and keep running.
 OPTIONS='{"host": "sshd", "port": 22, "username": "tester", "tmux_session": "", "font_size": 14,
-    "packages": ["Tmux"], "init_commands": ["echo smoke-init"], "keepalive_interval": 15,
+    "packages": ["Tmux"], "init_commands": ["echo integration-init"], "keepalive_interval": 15,
     "extra_ssh_options": ["ConnectTimeout=5"], "authorized_key_options": "from=\"172.30.33.0/24\"", "theme": "light", "grant_passwordless_sudo": false,
-    "env_vars": [{"name": "SMOKE_VAR", "value": "a b'"'"'c\"d $HOME; x"}]}'
+    "env_vars": [{"name": "INTEGRATION_VAR", "value": "a b'"'"'c\"d $HOME; x"}]}'
 echo "${OPTIONS}" > "${DATA}/options.json"
 mkdir -p "${DATA}/www/addons/self/options"
 echo "{\"result\": \"ok\", \"data\": ${OPTIONS}}" > "${DATA}/www/addons/self/options/config"
@@ -52,7 +52,7 @@ docker run -d --name supervisor --network "${NET}" -v "${DATA}/www:/www:ro" "${B
 echo "::endgroup::"
 
 echo "::group::Start the app"
-docker run -d --name app --network "${NET}" -e SUPERVISOR_TOKEN=smoke-test -v "${DATA}:/data" "${IMAGE}" >/dev/null
+docker run -d --name app --network "${NET}" -e SUPERVISOR_TOKEN=integration-test -v "${DATA}:/data" "${IMAGE}" >/dev/null
 pubkey=""
 for _ in $(seq 30); do
     pubkey=$(sudo cat "${DATA}/ssh/id_ed25519.pub" 2>/dev/null || true)
@@ -72,7 +72,7 @@ docker logs app 2>&1 | grep -q "Installing missing packages on tester@sshd: tmux
 # Init commands run after the package install, so their warning can come a moment later.
 init_warned=""
 for _ in $(seq 15); do
-    docker logs app 2>&1 | grep -qF "Init command failed on tester@sshd: echo smoke-init" && { init_warned=1; break; }
+    docker logs app 2>&1 | grep -qF "Init command failed on tester@sshd: echo integration-init" && { init_warned=1; break; }
     sleep 1
 done
 [[ -n "${init_warned}" ]] || fail "no warning for the failed init command"
@@ -103,11 +103,11 @@ echo "::endgroup::"
 
 echo "::group::SSH session"
 # One argument: ssh joins its arguments with spaces and the remote shell parses the result.
-out=$(docker exec app /usr/local/bin/remote-shell 'echo "smoke-ok $(id -un)"' 2>&1 || true)
+out=$(docker exec app /usr/local/bin/remote-shell 'echo "integration-ok $(id -un)"' 2>&1 || true)
 echo "${out}"
-grep -q "smoke-ok tester" <<< "${out}" || fail "remote-shell did not run a command as tester@sshd"
+grep -q "integration-ok tester" <<< "${out}" || fail "remote-shell did not run a command as tester@sshd"
 # No arguments: the login shell with env_vars, reading its commands from stdin.
-out=$(echo 'echo "[${SMOKE_VAR}]"; exit' | docker exec -i app /usr/local/bin/remote-shell 2>&1 || true)
+out=$(echo 'echo "[${INTEGRATION_VAR}]"; exit' | docker exec -i app /usr/local/bin/remote-shell 2>&1 || true)
 echo "${out}"
 grep -qF "[a b'c\"d \$HOME; x]" <<< "${out}" || fail "env_vars did not reach the remote shell"
 docker exec app ssh-keygen -F sshd -f /data/ssh/known_hosts >/dev/null || fail "the host key was not pinned"
@@ -131,4 +131,4 @@ echo "::endgroup::"
 if docker logs app 2>&1 | grep -E '\[(emerg|alert|crit)\]|ERROR'; then
     fail "the app logged errors"
 fi
-echo "Smoke test passed"
+echo "Integration test passed"

@@ -59,8 +59,8 @@ jobs:
           image-name: ${{ steps.normalize.outputs.image_name }}
           registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
 
-  smoke-test:
-    name: Smoke test
+  integration-test:
+    name: Integration test
     needs: prepare
     runs-on: ubuntu-24.04
     permissions:
@@ -69,26 +69,26 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Find the app's smoke test
+      - name: Find the app's integration test
         id: test
         run: |
-          if [[ -f "${{ inputs.app }}/tests/smoke.sh" ]]; then
+          if [[ -f "${{ inputs.app }}/tests/integration.sh" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No ${{ inputs.app }}/tests/smoke.sh, nothing to run."
+            echo "No ${{ inputs.app }}/tests/integration.sh, nothing to run."
           fi
 
       - name: Build the amd64 image
         if: steps.test.outputs.run == 'true'
-        run: docker buildx build --load --platform linux/amd64 -t "smoke/${{ inputs.app }}:ci" "./${{ inputs.app }}"
+        run: docker buildx build --load --platform linux/amd64 -t "integration/${{ inputs.app }}:ci" "./${{ inputs.app }}"
 
-      - name: Run the smoke test
+      - name: Run the integration test
         if: steps.test.outputs.run == 'true'
-        run: bash "${{ inputs.app }}/tests/smoke.sh" "smoke/${{ inputs.app }}:ci"
+        run: bash "${{ inputs.app }}/tests/integration.sh" "integration/${{ inputs.app }}:ci"
 
   build:
     name: Build ${{ matrix.arch }} image
-    needs: [prepare, smoke-test]
+    needs: [prepare, integration-test]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
