@@ -4,7 +4,7 @@ ARG BUILD_FROM=ghcr.io/home-assistant/base-debian:bookworm
 FROM ${BUILD_FROM}
 
 # GitHub release tag without "v"; updated by Renovate.
-ARG ALLOY_VERSION=1.21.2
+ARG ALLOY_VERSION=1.21.3
 ARG TARGETARCH
 
 RUN \
