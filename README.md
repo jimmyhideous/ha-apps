@@ -20,8 +20,9 @@ Manual: **Settings > Apps > Install app >** menu **> Repositories**, add `https:
 - `Builder`: on a pull request, `Smoke test` (amd64 image, `<app>/tests/smoke.sh`) and an unpublished build of
   each changed app for every architecture.
 - `Lint status` and `Builder status` are required checks; auto-merge merges when both pass.
-- On `main`, changed apps are published to `ghcr.io/jimmyhideous/app-<slug>` as `<version>` and `latest`;
-  existing versions are skipped. `Verify published image` checks the manifest architectures and runs the amd64
+- The release pull request (branch `publish`) publishes changed apps to `ghcr.io/jimmyhideous/app-<slug>` as
+  `<version>` and `latest` before it merges, so `main` never lists a version without an image; existing versions are
+  skipped. `Verify published image` checks the manifest architectures and runs the amd64
   image.
 - Every user-facing change bumps `version` and adds a `CHANGELOG.md` entry.
 - Renovate updates Grafana Alloy, ttyd, the base images, the smoke test images and GitHub Actions. An app update
