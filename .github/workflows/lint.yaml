@@ -9,7 +9,7 @@ on:
       - main
   schedule:
     - cron: "0 0 * * *"
-  # Started by Renovate version bump.
+  # Manual runs.
   workflow_dispatch:
 
 jobs:

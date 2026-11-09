@@ -24,9 +24,8 @@ Manual: **Settings > Apps > Install app >** menu **> Repositories**, add `https:
   existing versions are skipped. `Verify published image` checks the manifest architectures and runs the amd64
   image.
 - Every user-facing change bumps `version` and adds a `CHANGELOG.md` entry.
-- Renovate updates Grafana Alloy, the base image, the smoke test images and GitHub Actions.
-- `Renovate version bump` adds a patch `version` bump and changelog entry to Renovate's Alloy pull requests.
-- Renovate auto-merges minor and patch updates of Alloy and of the smoke test images; other updates are merged by
-  hand.
+- Renovate updates Grafana Alloy, ttyd, the base images, the smoke test images and GitHub Actions. An app update
+  bumps the app's patch `version` and adds a `CHANGELOG.md` entry. Minor and patch updates are released once CI
+  passes; major updates wait for review.
 
 Apps documentation: <https://contributors.home-assistant.io/apps/>
