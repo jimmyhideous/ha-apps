@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3
+
+- Update grafana/alloy to 1.21.3.
+
 ## 1.2.2
 
 - Alloy temp files in `/data/alloy/tmp`; no AppArmor denials on position saves.
