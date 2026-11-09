@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Smoke test: runs the app under its AppArmor profile with the runner's journal, a stand-in Supervisor API,
+# Integration test: runs the app under its AppArmor profile with the runner's journal, a stand-in Supervisor API,
 # a mapped /config and Loki with auth enabled, then checks shipping, options, merged config and the ingress UI.
 #
-# Usage: smoke.sh <image>   (Ubuntu runner with Docker and AppArmor)
+# Usage: integration.sh <image>   (Ubuntu runner with Docker and AppArmor)
 set -euo pipefail
 
 IMAGE="$1"
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOKI_IMAGE="grafana/loki:3.4.2"
 BUSYBOX_IMAGE="busybox:1.37.0"
-NET="ha-alloy-smoke"
-HOST_LABEL="ci-smoke"
+NET="ha-alloy-integration"
+HOST_LABEL="ci-integration"
 TENANT="ci-tenant"
-INGRESS_ENTRY="/api/hassio_ingress/smoke-token"
+INGRESS_ENTRY="/api/hassio_ingress/integration-token"
 SUPERVISOR_IP="172.30.32.2"
-MARKER="ha-alloy-smoke-${GITHUB_RUN_ID:-local}-${RANDOM}${RANDOM}"
+MARKER="ha-alloy-integration-${GITHUB_RUN_ID:-local}-${RANDOM}${RANDOM}"
 DATA="$(mktemp -d)"
 CONFIG="$(mktemp -d)"
 
@@ -70,14 +70,14 @@ echo "{\"result\": \"ok\", \"data\": {\"slug\": \"ha_alloy\", \"ingress\": true,
 cp -r "${DATA}/www/addons" "${DATA}/www/apps"
 # User folder: an existing file that must stay untouched and a component that uses the built-in writer.
 echo "keep me" > "${CONFIG}/README.txt"
-printf 'loki.relabel "user_smoke" {\n  forward_to = [loki.write.loki.receiver]\n}\n' > "${CONFIG}/smoke.alloy"
+printf 'loki.relabel "user_integration" {\n  forward_to = [loki.write.loki.receiver]\n}\n' > "${CONFIG}/integration.alloy"
 sudo chown -R root:root "${DATA}" "${CONFIG}"
 sudo chmod 755 "${DATA}" "${CONFIG}"
 docker run -d --name supervisor --network "${NET}" -v "${DATA}/www:/www:ro" "${BUSYBOX_IMAGE}" \
     httpd -f -v -p 80 -h /www >/dev/null
 docker run -d --name app --network "${NET}" \
     --security-opt apparmor=ci_ha_alloy \
-    -e SUPERVISOR_TOKEN=smoke-test \
+    -e SUPERVISOR_TOKEN=integration-test \
     -v "${JOURNAL}:/var/log/journal:ro" \
     -v "${DATA}:/data" \
     -v "${CONFIG}:/config" \
@@ -89,14 +89,14 @@ echo "::endgroup::"
 
 echo "::group::Ship marker lines"
 logger -t ha-alloy-excluded "${MARKER}-excluded"
-logger -t ha-alloy-smoke "${MARKER}"
+logger -t ha-alloy-integration "${MARKER}"
 loki_query() {
     curl -fsS -G -H "X-Scope-OrgID: ${TENANT}" http://127.0.0.1:3100/loki/api/v1/query_range \
         --data-urlencode "query=$1" --data-urlencode "since=15m" | jq -r '.data.result[].values[][1]'
 }
 found=""
 for _ in $(seq 45); do
-    found=$(loki_query "{job=\"journal\", host=\"${HOST_LABEL}\", app=\"ha-alloy-smoke\"} |= \"${MARKER}\"" \
+    found=$(loki_query "{job=\"journal\", host=\"${HOST_LABEL}\", app=\"ha-alloy-integration\"} |= \"${MARKER}\"" \
         | grep -F "${MARKER}" || true)
     [[ -n "${found}" ]] && break
     sleep 2
@@ -121,8 +121,8 @@ for _ in $(seq 15); do
 done
 grep -qF "<base href=\"${INGRESS_ENTRY}/\"" <<< "${ui}" || { echo "${ui}"; fail "UI index has no <base href=\"${INGRESS_ENTRY}/\">"; }
 components=$(probe "${SUPERVISOR_IP}" /api/v0/web/components || true)
-jq -e '.[] | select(.localID == "loki.relabel.user_smoke")' <<< "${components}" >/dev/null \
-    || { echo "${components}"; fail "API through ingress does not list loki.relabel.user_smoke"; }
+jq -e '.[] | select(.localID == "loki.relabel.user_integration")' <<< "${components}" >/dev/null \
+    || { echo "${components}"; fail "API through ingress does not list loki.relabel.user_integration"; }
 jq -r '.[].localID' <<< "${components}"
 denied=$(probe "" / || true)
 grep -q '403' <<< "${denied}" || { echo "${denied}"; fail "ingress port answered a client other than ${SUPERVISOR_IP}"; }
@@ -143,4 +143,4 @@ fi
 if docker logs app 2>&1 | grep -E 'level=error|\[(emerg|alert|crit)\]'; then
     fail "Alloy or nginx logged errors"
 fi
-echo "Smoke test passed"
+echo "Integration test passed"
