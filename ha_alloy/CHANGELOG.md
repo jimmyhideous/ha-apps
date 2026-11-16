@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.4
+
+- Update grafana/alloy to 1.22.0.
+
 ## 1.2.3
 
 - Update grafana/alloy to 1.21.3.
