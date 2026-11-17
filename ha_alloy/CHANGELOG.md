@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.5
+
+- Deny the host-ID and OpenSSL config reads that AppArmor logged at every start.
+
 ## 1.2.4
 
 - Update grafana/alloy to 1.22.0.
