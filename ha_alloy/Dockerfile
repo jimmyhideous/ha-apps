@@ -3,10 +3,14 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base-debian:bookworm
 FROM ${BUILD_FROM}
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # GitHub release tag without "v"; updated by Renovate.
 ARG ALLOY_VERSION=1.22.0
 ARG TARGETARCH
 
+# sha256sum -c finds the download by name in the working directory.
+WORKDIR /tmp
 RUN \
     if [ -z "${TARGETARCH}" ]; then \
         echo "TARGETARCH is not set, please use Docker BuildKit for the build." && exit 1; \
@@ -20,7 +24,6 @@ RUN \
     && alloy_url="https://github.com/grafana/alloy/releases/download/v${ALLOY_VERSION}" \
     && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl libsystemd0 nginx \
-    && cd /tmp \
     && curl -fsSLO "${alloy_url}/${alloy_deb}" \
     && curl -fsSL "${alloy_url}/SHA256SUMS" | grep " ${alloy_deb}\$" | sha256sum -c - \
     && apt-get install -y --no-install-recommends "/tmp/${alloy_deb}" \
@@ -28,6 +31,7 @@ RUN \
     && rm -rf /var/lib/apt/lists/* \
     && /usr/bin/alloy --version \
     && /usr/sbin/nginx -v
+WORKDIR /
 
 COPY rootfs /
 

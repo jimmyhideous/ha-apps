@@ -16,7 +16,7 @@ Manual: **Settings > Apps > Install app >** menu **> Repositories**, add `https:
 ## Maintenance
 
 - `main` changes only through pull requests; direct pushes, force pushes and deletion are blocked.
-- `Lint`: app linter on every app.
+- `Lint`: app linter on every app, ShellCheck on the shell scripts, Hadolint on the Dockerfiles.
 - `Builder`: on a pull request, `Integration test` (amd64 image, `<app>/tests/integration.sh`) and a build of
   each changed app for every architecture.
 - `Lint status` and `Builder status` are required checks; auto-merge merges when both pass.
