@@ -42,16 +42,50 @@ jobs:
         with:
           path: "./${{ matrix.path }}"
 
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 🚀 Run ShellCheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        with:
+          # s6 service scripts have no extension and a bashio shebang, which the action doesn't detect as shell.
+          additional_files: run finish
+          # Notes and style suggestions show in the log without failing the check.
+          severity: warning
+        env:
+          SHELLCHECK_OPTS: -s bash
+
+  hadolint:
+    name: Hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 🚀 Run Hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          recursive: true
+          # DL3008: pinned Debian package versions break the build on every Debian update, and Renovate doesn't
+          # track them.
+          ignore: DL3008
+
   status:
     name: Lint status
-    needs: [find, lint]
+    needs: [find, lint, shellcheck, hadolint]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Check that every app passed the linter
+      - name: Check that every app passed the linters
         env:
           FIND: ${{ needs.find.result }}
           LINT: ${{ needs.lint.result }}
+          SHELLCHECK: ${{ needs.shellcheck.result }}
+          HADOLINT: ${{ needs.hadolint.result }}
         run: |
-          echo "find: ${FIND}, lint: ${LINT}"
-          [[ "${FIND}" == "success" && "${LINT}" == "success" ]]
+          echo "find: ${FIND}, lint: ${LINT}, shellcheck: ${SHELLCHECK}, hadolint: ${HADOLINT}"
+          [[ "${FIND}" == "success" && "${LINT}" == "success" && "${SHELLCHECK}" == "success" && "${HADOLINT}" == "success" ]]
