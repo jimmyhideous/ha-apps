@@ -1,6 +1,6 @@
 # https://contributors.home-assistant.io/apps/reference/configuration/
 name: SMART to MQTT
-version: "1.0.0"
+version: "1.0.1"
 slug: smart_mqtt
 description: Publishes disk SMART data from UDisks2 to MQTT with Home Assistant discovery
 url: "https://github.com/jimmyhideous/ha-apps/tree/main/smart_mqtt"

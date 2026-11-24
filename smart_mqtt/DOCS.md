@@ -50,6 +50,10 @@ Each drive gets the sensors its SMART data supports:
 - `smart_mqtt/<id>/state`: JSON with the drive's values, retained.
 - `<discovery_prefix>/device/smart_mqtt_<id>/config`: device discovery, retained.
 
+A dev build (an app slug ending in `_dev`) uses `smart_mqtt_dev` instead of `smart_mqtt` in every topic, the
+MQTT client ID and the unique IDs, and adds " (dev)" to the device names. It runs next to the stable app with its
+own devices and entities.
+
 `<id>` is the first 12 hex digits of the SHA-256 hash of the drive's serial number. The serial number itself is
 never published or logged.
 

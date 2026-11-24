@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Integration test: runs the app against a stand-in Supervisor API, a private D-Bus system bus with a stand-in
 # UDisks2 (tests/fake_udisks2.py) and a Mosquitto broker, then checks the discovery and state messages, that no
-# serial number is published, the offline message on stop, and a start with an external broker (mqtt_host).
+# serial number is published, the offline message on stop, a start with an external broker (mqtt_host), and a dev
+# build (slug *_dev) next to it on its own topics.
 #
 # Usage: integration.sh <image>   (Ubuntu runner with Docker)
 set -euo pipefail
@@ -18,8 +19,9 @@ DATA="$(mktemp -d)"
 
 cleanup() {
     echo "::group::app log"; docker logs app 2>&1 || true; echo "::endgroup::"
+    echo "::group::app_dev log"; docker logs app_dev 2>&1 || true; echo "::endgroup::"
     echo "::group::udisks log"; docker logs udisks 2>&1 || true; echo "::endgroup::"
-    docker rm -f app udisks dbus mosquitto supervisor >/dev/null 2>&1 || true
+    docker rm -f app app_dev udisks dbus mosquitto supervisor >/dev/null 2>&1 || true
     docker volume rm "${BUS_VOLUME}" >/dev/null 2>&1 || true
     docker network rm "${NET}" >/dev/null 2>&1 || true
     sudo rm -rf "${DATA}"
@@ -31,7 +33,8 @@ fail() { echo "::error::$*"; exit 1; }
 # Prints every retained message under the app's topics as "topic payload" lines.
 retained() {
     docker run --rm --network "${NET}" "${MOSQUITTO_IMAGE}" \
-        mosquitto_sub -h mosquitto -t 'homeassistant/device/#' -t 'smart_mqtt/#' -v --retained-only -W 3 2>/dev/null || true
+        mosquitto_sub -h mosquitto -t 'homeassistant/device/#' -t 'smart_mqtt/#' -t 'smart_mqtt_dev/#' -v \
+        --retained-only -W 3 2>/dev/null || true
 }
 
 # Prints the payload of one topic from the retained messages in $messages.
@@ -39,17 +42,28 @@ payload() { awk -v t="$1" '$1 == t { sub(/^[^ ]+ /, ""); print }' <<< "${message
 
 hash12() { printf '%s' "$1" | sha256sum | cut -c1-12; }
 
-# Starts a new app container, as the Supervisor does on every start; bashio caches API answers in /tmp.
+# Starts a new app container (default name app), as the Supervisor does on every start; bashio caches API answers
+# in /tmp.
 start_app() {
-    docker rm -f app >/dev/null 2>&1 || true
-    docker run -d --name app --network "${NET}" -e SUPERVISOR_TOKEN=test \
+    local name="${1:-app}"
+    docker rm -f "${name}" >/dev/null 2>&1 || true
+    docker run -d --name "${name}" --network "${NET}" -e SUPERVISOR_TOKEN=test \
         -e DBUS_SYSTEM_BUS_ADDRESS="${BUS_ADDRESS}" -v "${BUS_VOLUME}:/run/dbus" -v "${DATA}:/data" "${IMAGE}" >/dev/null
 }
 
 check_app_errors() {
-    if docker logs app 2>&1 | grep -E 'Traceback|ERROR'; then
-        fail "the app logged errors"
+    local name="${1:-app}"
+    if docker logs "${name}" 2>&1 | grep -E 'Traceback|ERROR'; then
+        fail "${name} logged errors"
     fi
+}
+
+# Sets the slug the stand-in Supervisor reports for the app (read by bashio::app.slug).
+set_slug() {
+    sudo mkdir -p "${DATA}/www/addons/self" "${DATA}/www/apps/self"
+    for api in addons apps; do
+        echo "{\"result\": \"ok\", \"data\": {\"slug\": \"$1\"}}" | sudo tee "${DATA}/www/${api}/self/info" >/dev/null
+    done
 }
 
 # Writes the app's options (JSON on stdin) to /data/options.json (read by the publisher) and to the stand-in
@@ -108,6 +122,7 @@ mkdir -p "${DATA}/www/services"
 echo '{"result": "ok", "data": {"host": "mosquitto", "port": 1883, "ssl": false, "protocol": "3.1.1",
     "username": "addons", "password": "test"}}' > "${DATA}/www/services/mqtt"
 echo '{"discovery_prefix": "homeassistant", "log_level": "debug", "mqtt_port": 1883, "mqtt_tls": false}' | set_options
+set_slug smart_mqtt
 sudo chown -R root:root "${DATA}"
 sudo chmod 755 "${DATA}"
 docker run -d --name supervisor --network "${NET}" -v "${DATA}/www:/www:ro" "${BUSYBOX_IMAGE}" \
@@ -182,5 +197,27 @@ grep -q "Using the MQTT broker from mqtt_host: mosquitto:1883" <<< "$(docker log
     fail "the app did not use mqtt_host"
 echo "::endgroup::"
 
+echo "::group::Dev build next to the stable app"
+# The stable app read its slug at start; the dev container gets smart_mqtt_dev.
+set_slug smart_mqtt_dev
+start_app app_dev
+for _ in $(seq 30); do
+    messages="$(retained)"
+    grep -q "^smart_mqtt_dev/${ata_id}/state " <<< "${messages}" && break
+    sleep 2
+done
+[[ "$(payload smart_mqtt_dev/status)" == "online" ]] || fail "smart_mqtt_dev/status is not online"
+[[ "$(payload smart_mqtt/status)" == "online" ]] || fail "the stable app went offline when the dev build started"
+dev_config="$(payload "homeassistant/device/smart_mqtt_dev_${ata_id}/config")"
+jq -e --arg id "${ata_id}" '
+    .dev.ids == ["smart_mqtt_dev_" + $id] and .dev.name == "Micron 1100 SATA 256GB (dev)"
+    and .stat_t == "smart_mqtt_dev/" + $id + "/state" and .avty_t == "smart_mqtt_dev/status"
+    and .cmps.temperature.uniq_id == "smart_mqtt_dev_" + $id + "_temperature"' \
+    <<< "${dev_config}" >/dev/null || fail "unexpected dev discovery config: ${dev_config}"
+payload "homeassistant/device/smart_mqtt_${ata_id}/config" | jq -e '.dev.name == "Micron 1100 SATA 256GB"' >/dev/null ||
+    fail "the stable discovery config changed"
+echo "::endgroup::"
+
 check_app_errors
+check_app_errors app_dev
 echo "Integration test passed"
