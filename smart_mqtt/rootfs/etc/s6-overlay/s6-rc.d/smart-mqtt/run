@@ -1,0 +1,33 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Pick the MQTT broker (the mqtt_host option, else the broker app from the
+# Supervisor services API) and start the publisher
+# ==============================================================================
+MQTT_USERNAME=""
+MQTT_PASSWORD=""
+if bashio::config.has_value 'mqtt_host'; then
+    MQTT_HOST="$(bashio::config 'mqtt_host')"
+    MQTT_PORT="$(bashio::config 'mqtt_port')"
+    # bashio::config prints "null" for an unset option.
+    if bashio::config.has_value 'mqtt_username'; then
+        MQTT_USERNAME="$(bashio::config 'mqtt_username')"
+    fi
+    if bashio::config.has_value 'mqtt_password'; then
+        MQTT_PASSWORD="$(bashio::config 'mqtt_password')"
+    fi
+    MQTT_TLS="$(bashio::config 'mqtt_tls')"
+    bashio::log.info "Using the MQTT broker from mqtt_host: ${MQTT_HOST}:${MQTT_PORT}"
+elif bashio::services.available mqtt; then
+    MQTT_HOST="$(bashio::services mqtt host)"
+    MQTT_PORT="$(bashio::services mqtt port)"
+    MQTT_USERNAME="$(bashio::services mqtt username)"
+    MQTT_PASSWORD="$(bashio::services mqtt password)"
+    MQTT_TLS="$(bashio::services mqtt ssl)"
+    bashio::log.info "Using the MQTT broker app: ${MQTT_HOST}:${MQTT_PORT}"
+else
+    bashio::exit.nok "No MQTT broker: set mqtt_host, or install and start an MQTT broker app such as Mosquitto"
+fi
+export MQTT_HOST MQTT_PORT MQTT_USERNAME MQTT_PASSWORD MQTT_TLS
+
+exec python3 /usr/local/bin/smart_mqtt.py
