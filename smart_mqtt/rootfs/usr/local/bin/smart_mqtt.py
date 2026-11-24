@@ -20,7 +20,10 @@ UDISKS = "org.freedesktop.UDisks2"
 DRIVE = f"{UDISKS}.Drive"
 ATA = f"{UDISKS}.Drive.Ata"
 NVME = f"{UDISKS}.NVMe.Controller"
-TOPIC = "smart_mqtt"
+# Base of every topic, MQTT client ID, device ID and unique ID. The run script sets smart_mqtt_dev for a dev build, so
+# it can run next to the stable app without sharing devices or entities.
+TOPIC = os.environ.get("SMART_MQTT_TOPIC", "smart_mqtt")
+DEV_BUILD = TOPIC.endswith("_dev")
 AVAILABILITY_TOPIC = f"{TOPIC}/status"
 APP_URL = "https://github.com/jimmyhideous/ha-apps/tree/main/smart_mqtt"
 KELVIN_OFFSET = 273.15
@@ -166,7 +169,7 @@ def discovery_config(drive_id, drive, keys):
         components[key] = {option: value for option, value in config.items() if value is not None}
     device = {
         "ids": [f"{TOPIC}_{drive_id}"],
-        "name": drive["Model"] or "Disk",
+        "name": (drive["Model"] or "Disk") + (" (dev)" if DEV_BUILD else ""),
         "mf": drive["Vendor"],
         "mdl": drive["Model"],
         "sw": drive["Revision"],
