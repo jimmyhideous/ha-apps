@@ -1,0 +1,25 @@
+---
+configuration:
+  discovery_prefix:
+    name: Discovery prefix
+    description: MQTT discovery prefix of Home Assistant's MQTT integration.
+  log_level:
+    name: Log level
+    description: Lowest level the app logs. Debug logs every reading.
+  mqtt_host:
+    name: MQTT host
+    description: >-
+      External MQTT broker, a hostname or IP address. Leave empty to use the MQTT broker app, such as Mosquitto.
+  mqtt_port:
+    name: MQTT port
+    description: Port of the external broker.
+  mqtt_username:
+    name: MQTT username
+    description: Login for the external broker.
+  mqtt_password:
+    name: MQTT password
+    description: Password for the external broker.
+  mqtt_tls:
+    name: MQTT TLS
+    description: >-
+      Connect to the external broker with TLS and check its certificate against the system's public CAs.

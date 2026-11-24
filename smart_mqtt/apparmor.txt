@@ -1,0 +1,40 @@
+#include <tunables/global>
+
+# s6-overlay, the bashio run script and the Python publisher. The Supervisor loads this as
+# "<repository hash>_smart_mqtt".
+
+profile smart_mqtt flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  file,
+  signal (send) set=(kill,term,int,hup,cont),
+  signal (receive) peer=unconfined,
+
+  # MQTT broker and Supervisor API (TCP, DNS), host system bus (UDisks2)
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+  network unix stream,
+  dbus (send, receive) bus=system,
+
+  # s6-overlay
+  /init ix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/s6-overlay/** rix,
+  /run/{,**} rwk,
+  /dev/tty rw,
+
+  # bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+  /data/** rw,
+
+  # Python
+  /usr/local/bin/** ix,
+  /usr/local/lib/** rm,
+}
