@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Integration test: runs the app against a stand-in Supervisor API, a private D-Bus system bus with a stand-in
 # UDisks2 (tests/fake_udisks2.py) and a Mosquitto broker, then checks the discovery and state messages, that no
-# serial number is published, the offline message on stop, a start with an external broker (mqtt_host), and a dev
-# build (slug *_dev) next to it on its own topics.
+# serial number is published, the offline message on stop, a start with an external broker (mqtt_host), a dev
+# build (slug *_dev) next to it on its own topics, and an external TLS broker with a private CA that requires a
+# client certificate (files in /ssl).
 #
 # Usage: integration.sh <image>   (Ubuntu runner with Docker)
 set -euo pipefail
@@ -16,15 +17,16 @@ NET="smart-mqtt-integration"
 BUS_VOLUME="smart-mqtt-integration-bus"
 BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket"
 DATA="$(mktemp -d)"
+SSL="$(mktemp -d)"
 
 cleanup() {
     echo "::group::app log"; docker logs app 2>&1 || true; echo "::endgroup::"
     echo "::group::app_dev log"; docker logs app_dev 2>&1 || true; echo "::endgroup::"
     echo "::group::udisks log"; docker logs udisks 2>&1 || true; echo "::endgroup::"
-    docker rm -f app app_dev udisks dbus mosquitto supervisor >/dev/null 2>&1 || true
+    docker rm -f app app_dev udisks dbus mosquitto mosquitto-tls supervisor >/dev/null 2>&1 || true
     docker volume rm "${BUS_VOLUME}" >/dev/null 2>&1 || true
     docker network rm "${NET}" >/dev/null 2>&1 || true
-    sudo rm -rf "${DATA}"
+    sudo rm -rf "${DATA}" "${SSL}"
 }
 trap cleanup EXIT
 
@@ -48,7 +50,8 @@ start_app() {
     local name="${1:-app}"
     docker rm -f "${name}" >/dev/null 2>&1 || true
     docker run -d --name "${name}" --network "${NET}" -e SUPERVISOR_TOKEN=test \
-        -e DBUS_SYSTEM_BUS_ADDRESS="${BUS_ADDRESS}" -v "${BUS_VOLUME}:/run/dbus" -v "${DATA}:/data" "${IMAGE}" >/dev/null
+        -e DBUS_SYSTEM_BUS_ADDRESS="${BUS_ADDRESS}" -v "${BUS_VOLUME}:/run/dbus" -v "${DATA}:/data" \
+        -v "${SSL}:/ssl:ro" "${IMAGE}" >/dev/null
 }
 
 check_app_errors() {
@@ -83,6 +86,21 @@ echo "::group::Start the broker, the system bus and the stand-in UDisks2"
 docker network create "${NET}" >/dev/null
 docker volume create "${BUS_VOLUME}" >/dev/null
 docker run -d --name mosquitto --network "${NET}" "${MOSQUITTO_IMAGE}" mosquitto -c /mosquitto-no-auth.conf >/dev/null
+# A private CA signs the TLS broker's certificate (name mosquitto-tls) and the app's client certificate.
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=test-ca -keyout "${SSL}/ca.key" -out "${SSL}/ca.pem" \
+    -addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign 2>/dev/null
+for name in server client; do
+    openssl req -newkey rsa:2048 -nodes -subj /CN=mosquitto-tls -addext subjectAltName=DNS:mosquitto-tls \
+        -keyout "${SSL}/${name}.key" -out "${SSL}/${name}.csr" 2>/dev/null
+    openssl x509 -req -in "${SSL}/${name}.csr" -CA "${SSL}/ca.pem" -CAkey "${SSL}/ca.key" -days 1 \
+        -copy_extensions copyall -out "${SSL}/${name}.pem" 2>/dev/null
+done
+chmod 755 "${SSL}"
+chmod 644 "${SSL}"/*
+printf '%s\n' 'listener 8883' 'cafile /ssl/ca.pem' 'certfile /ssl/server.pem' 'keyfile /ssl/server.key' \
+    'require_certificate true' 'allow_anonymous true' > "${SSL}/mosquitto.conf"
+docker run -d --name mosquitto-tls --network "${NET}" -v "${SSL}:/ssl:ro" "${MOSQUITTO_IMAGE}" \
+    mosquitto -c /ssl/mosquitto.conf >/dev/null
 docker run -d --name dbus --network "${NET}" -v "${BUS_VOLUME}:/run/dbus" "${DBUS_IMAGE}" sh -euc '
     apk add --no-cache -q dbus
     cat > /tmp/bus.conf <<EOF
@@ -218,6 +236,27 @@ payload "homeassistant/device/smart_mqtt_${ata_id}/config" | jq -e '.dev.name ==
     fail "the stable discovery config changed"
 echo "::endgroup::"
 
-check_app_errors
 check_app_errors app_dev
+
+echo "::group::External TLS broker with a private CA and a client certificate"
+check_app_errors
+echo '{"discovery_prefix": "homeassistant", "log_level": "info", "mqtt_host": "mosquitto-tls", "mqtt_port": 8883,
+    "mqtt_tls": true, "mqtt_ca_cert": "ca.pem", "mqtt_client_cert": "client.pem", "mqtt_client_key": "client.key"}' |
+    set_options
+set_slug smart_mqtt
+start_app
+tls_status=""
+for _ in $(seq 30); do
+    tls_status="$(docker run --rm --network "${NET}" -v "${SSL}:/ssl:ro" "${MOSQUITTO_IMAGE}" \
+        mosquitto_sub -h mosquitto-tls -p 8883 --cafile /ssl/ca.pem --cert /ssl/client.pem --key /ssl/client.key \
+        -t smart_mqtt/status --retained-only -W 3 2>/dev/null || true)"
+    [[ "${tls_status}" == "online" ]] && break
+    sleep 2
+done
+[[ "${tls_status}" == "online" ]] || fail "smart_mqtt/status is not online on the TLS broker"
+grep -q "Using the MQTT broker from mqtt_host: mosquitto-tls:8883" <<< "$(docker logs app 2>&1)" ||
+    fail "the app did not use the TLS broker"
+echo "::endgroup::"
+
+check_app_errors
 echo "Integration test passed"

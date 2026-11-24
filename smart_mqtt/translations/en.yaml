@@ -22,4 +22,18 @@ configuration:
   mqtt_tls:
     name: MQTT TLS
     description: >-
-      Connect to the external broker with TLS and check its certificate against the system's public CAs.
+      Connect to the external broker with TLS. Without a CA certificate, the app checks the broker's certificate
+      against the system's public CAs.
+  mqtt_ca_cert:
+    name: MQTT CA certificate
+    description: >-
+      File in /ssl with the CA certificate (PEM) that signed the broker's certificate, for example mqtt/ca.pem.
+      Needs MQTT TLS.
+  mqtt_client_cert:
+    name: MQTT client certificate
+    description: File in /ssl with the client certificate (PEM), for a broker that requires one. Needs MQTT TLS.
+  mqtt_client_key:
+    name: MQTT client key
+    description: >-
+      File in /ssl with the client certificate's private key (PEM). Leave empty when the key is in the client
+      certificate file.

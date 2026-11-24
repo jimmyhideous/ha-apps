@@ -17,6 +17,21 @@ if bashio::config.has_value 'mqtt_host'; then
         MQTT_PASSWORD="$(bashio::config 'mqtt_password')"
     fi
     MQTT_TLS="$(bashio::config 'mqtt_tls')"
+    # The certificate options name files in /ssl; the publisher reads MQTT_CA_CERT, MQTT_CLIENT_CERT and
+    # MQTT_CLIENT_KEY.
+    for option in mqtt_ca_cert mqtt_client_cert mqtt_client_key; do
+        bashio::config.has_value "${option}" || continue
+        if ! bashio::config.true 'mqtt_tls'; then
+            bashio::log.warning "${option} is set, but mqtt_tls is off, so the app doesn't use it"
+            continue
+        fi
+        file="/ssl/$(bashio::config "${option}")"
+        [[ -r "${file}" ]] || bashio::exit.nok "${option}: ${file} doesn't exist"
+        declare -x "${option^^}=${file}"
+    done
+    if [[ -n "${MQTT_CLIENT_KEY:-}" && -z "${MQTT_CLIENT_CERT:-}" ]]; then
+        bashio::exit.nok "mqtt_client_key needs mqtt_client_cert"
+    fi
     bashio::log.info "Using the MQTT broker from mqtt_host: ${MQTT_HOST}:${MQTT_PORT}"
 elif bashio::services.available mqtt; then
     MQTT_HOST="$(bashio::services mqtt host)"
