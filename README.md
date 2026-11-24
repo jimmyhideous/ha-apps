@@ -12,7 +12,6 @@ Manual: **Settings > Apps > Install app >** menu **> Repositories**, add `https:
 |---|---|
 | [HA Alloy](./ha_alloy) | Ships the Home Assistant OS journal to Grafana Loki with Grafana Alloy. `aarch64`, `amd64`. |
 | [Remote Terminal](./remote_terminal) | Sidebar web terminal that opens an SSH session on another host. `aarch64`, `amd64`. |
-| [SMART to MQTT](./smart_mqtt) | Disk health sensors: SMART data of the host's ATA and NVMe drives from UDisks2, published to MQTT with discovery. `aarch64`, `amd64`. |
 
 ## Maintenance
 
@@ -26,7 +25,9 @@ Manual: **Settings > Apps > Install app >** menu **> Repositories**, add `https:
   skipped. `Verify published image` checks the manifest architectures and runs the amd64
   image.
 - Every user-facing change bumps `version` and adds a `CHANGELOG.md` entry.
-- Renovate updates Grafana Alloy, ttyd, the Python packages in `requirements.txt`, the base images, the integration test images and GitHub Actions. An app update
+- `Release` creates a GitHub release for every app version that reaches `main`: tag `<slug>-<version>`, notes from
+  that version's `CHANGELOG.md` section.
+- Renovate updates Grafana Alloy, ttyd, the base images, the integration test images and GitHub Actions. An app update
   bumps the app's patch `version` and adds a `CHANGELOG.md` entry. Minor and patch updates are released once CI
   passes; major updates wait for review.
 

@@ -1,0 +1,45 @@
+name: Release
+
+# A merged release pull request has already published the images, so every app version on main that has no
+# release yet gets one: tag <slug>-<version>, notes from that version's CHANGELOG.md section. Dev versions
+# (-dev in the version) are marked as pre-releases.
+on:
+  push:
+    branches:
+      - main
+  # Manual runs create releases that a failed run missed.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release new app versions
+    if: github.repository == 'jimmyhideous/ha-apps'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create a release for every app version without one
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for config in */config.yaml; do
+            app=${config%/config.yaml}
+            version=$(sed -n 's/^version: "\(.*\)"$/\1/p' "${config}")
+            tag="${app}-${version}"
+            if gh release view "${tag}" >/dev/null 2>&1; then
+              continue
+            fi
+            # The lines between this version's heading and the next one.
+            notes=$(awk -v heading="## ${version}" '$0 == heading { on = 1; next } /^## / { on = 0 } on' "${app}/CHANGELOG.md")
+            prerelease=()
+            if [[ "${version}" == *-dev* ]]; then
+              prerelease=(--prerelease)
+            fi
+            gh release create "${tag}" --target "${GITHUB_SHA}" --title "$(sed -n 's/^name: //p' "${config}") ${version}" \
+              --notes "${notes:-No changelog entry.}" "${prerelease[@]}"
+            echo "Released ${tag}"
+          done
