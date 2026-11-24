@@ -189,7 +189,12 @@ def connect_mqtt():
     if os.environ.get("MQTT_USERNAME"):
         client.username_pw_set(os.environ["MQTT_USERNAME"], os.environ.get("MQTT_PASSWORD") or None)
     if os.environ.get("MQTT_TLS") == "true":
-        client.tls_set()
+        # Unset files: the system's public CAs and no client certificate.
+        client.tls_set(
+            ca_certs=os.environ.get("MQTT_CA_CERT") or None,
+            certfile=os.environ.get("MQTT_CLIENT_CERT") or None,
+            keyfile=os.environ.get("MQTT_CLIENT_KEY") or None,
+        )
     client.will_set(AVAILABILITY_TOPIC, "offline", qos=1, retain=True)
     client.on_connect = lambda c, userdata, flags, reason, props: c.publish(
         AVAILABILITY_TOPIC, "online", qos=1, retain=True

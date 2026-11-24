@@ -21,7 +21,13 @@ system bus, so it needs no raw disk access and works with protection mode on.
 | `mqtt_port` | `1883` | Port of the external broker. |
 | `mqtt_username` | unset | Login for the external broker. |
 | `mqtt_password` | unset | Password for the external broker. |
-| `mqtt_tls` | `false` | Connect to the external broker with TLS, checking its certificate against the system's public CAs. A broker with a private CA isn't supported. |
+| `mqtt_tls` | `false` | Connect to the external broker with TLS. Without `mqtt_ca_cert`, the app checks the broker's certificate against the system's public CAs. |
+| `mqtt_ca_cert` | unset | CA certificate (PEM) that signed the broker's certificate, for a broker with a private CA. |
+| `mqtt_client_cert` | unset | Client certificate (PEM), for a broker that requires one. |
+| `mqtt_client_key` | unset | Private key of the client certificate (PEM). Leave empty when the key is in the `mqtt_client_cert` file. |
+
+The certificate options are file names in the Home Assistant `/ssl` folder, for example `mqtt/ca.pem` for
+`/ssl/mqtt/ca.pem`, and take effect only with `mqtt_tls` on.
 
 The app reads SMART data every 10 minutes, the interval at which UDisks2 refreshes it.
 
