@@ -30,4 +30,12 @@ else
 fi
 export MQTT_HOST MQTT_PORT MQTT_USERNAME MQTT_PASSWORD MQTT_TLS
 
+# A dev build (slug ending in _dev) gets its own topics and IDs.
+SMART_MQTT_TOPIC=smart_mqtt
+if [[ "$(bashio::app.slug)" == *_dev ]]; then
+    SMART_MQTT_TOPIC=smart_mqtt_dev
+fi
+bashio::log.info "Publishing under ${SMART_MQTT_TOPIC}/"
+export SMART_MQTT_TOPIC
+
 exec python3 /usr/local/bin/smart_mqtt.py
