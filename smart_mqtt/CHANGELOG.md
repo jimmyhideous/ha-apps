@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Update ghcr.io/home-assistant/base-python to 3.15.
+
 ## 1.1.0
 
 - New options `mqtt_ca_cert`, `mqtt_client_cert` and `mqtt_client_key` for an external TLS broker with a private
