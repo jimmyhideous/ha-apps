@@ -56,27 +56,27 @@ docker run -d --name app --network "${NET}" -e SUPERVISOR_TOKEN=integration-test
 pubkey=""
 for _ in $(seq 30); do
     pubkey=$(sudo cat "${DATA}/ssh/id_ed25519.pub" 2>/dev/null || true)
-    [[ -n "${pubkey}" ]] && docker logs app 2>&1 | grep -qF "${pubkey}" && break
+    [[ -n "${pubkey}" ]] && grep -qF "${pubkey}" <<< "$(docker logs app 2>&1)" && break
     sleep 1
 done
 [[ -n "${pubkey}" ]] || fail "no client key in /data/ssh"
-docker logs app 2>&1 | grep -qF "${pubkey}" || fail "the public key is not in the log"
+grep -qF "${pubkey}" <<< "$(docker logs app 2>&1)" || fail "the public key is not in the log"
 [[ "$(docker inspect -f '{{.State.Running}}' app)" == "true" ]] || fail "the app exited"
 warned=""
 for _ in $(seq 15); do
-    docker logs app 2>&1 | grep -q "Package install on tester@sshd failed" && { warned=1; break; }
+    grep -q "Package install on tester@sshd failed" <<< "$(docker logs app 2>&1)" && { warned=1; break; }
     sleep 1
 done
 [[ -n "${warned}" ]] || fail "no warning for the failed package install"
-docker logs app 2>&1 | grep -q "Installing missing packages on tester@sshd: tmux" || fail "package names were not lowercased"
+grep -q "Installing missing packages on tester@sshd: tmux" <<< "$(docker logs app 2>&1)" || fail "package names were not lowercased"
 # Init commands run after the package install, so their warning can come a moment later.
 init_warned=""
 for _ in $(seq 15); do
-    docker logs app 2>&1 | grep -qF "Init command failed on tester@sshd: echo integration-init" && { init_warned=1; break; }
+    grep -qF "Init command failed on tester@sshd: echo integration-init" <<< "$(docker logs app 2>&1)" && { init_warned=1; break; }
     sleep 1
 done
 [[ -n "${init_warned}" ]] || fail "no warning for the failed init command"
-docker logs app 2>&1 | grep -qF "from=\"172.30.33.0/24\" ${pubkey}" || fail "the log does not show authorized_key_options"
+grep -qF "from=\"172.30.33.0/24\" ${pubkey}" <<< "$(docker logs app 2>&1)" || fail "the log does not show authorized_key_options"
 [[ "$(docker inspect -f '{{.State.Running}}' app)" == "true" ]] || fail "the app exited after the package install"
 # A session that cannot log in (sshd is not up yet) shows the public key in the panel.
 out=$(echo | docker exec -i app /usr/local/bin/remote-shell 2>&1 || true)
@@ -95,7 +95,7 @@ docker run -d --name sshd --network "${NET}" -e PUBKEY="${pubkey}" "${SSHD_IMAGE
     exec /usr/sbin/sshd -D -e' >/dev/null
 ready=""
 for _ in $(seq 60); do
-    docker logs sshd 2>&1 | grep -q "Server listening" && { ready=1; break; }
+    grep -q "Server listening" <<< "$(docker logs sshd 2>&1)" && { ready=1; break; }
     sleep 1
 done
 [[ -n "${ready}" ]] || fail "sshd did not start"
